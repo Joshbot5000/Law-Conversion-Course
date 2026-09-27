@@ -1,0 +1,44 @@
+# Publishes your revision hub website every time you commit.
+# This file must live at: .github/workflows/revision-hub.yml
+# (see START-HERE.md, step 5, for how to put it there from the GitHub website)
+
+name: Publish revision hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Get the repository files
+        uses: actions/checkout@v4
+
+      - name: Index posters, flashcards and notes
+        run: python3 scripts/build_library.py
+
+      - name: Set up GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Package the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v5

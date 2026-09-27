@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revision hub</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDEFEA; --surface:#F8F9F5; --ink:#1B2238; --muted:#566077; --line:#CDD2C8;
+  --tape:#C23E6A; --tape-soft:#F3D9E2; --buff:#D9C9A0; --buff-ink:#4A3F22;
+  --good:#2D6A55; --good-soft:#D8EAE2; --warn:#8A5A0B; --warn-soft:#F6E7C8;
+  --serif:"Libre Caslon Text",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#141A29; --surface:#1C2335; --ink:#E7E9E2; --muted:#A0A8BA; --line:#2F3852;
+    --tape:#E27499; --tape-soft:#3A2230; --buff:#5E5234; --buff-ink:#F1E6C8;
+    --good:#7CC4A6; --good-soft:#1D3530; --warn:#E8B75C; --warn-soft:#3A2F17;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141A29; --surface:#1C2335; --ink:#E7E9E2; --muted:#A0A8BA; --line:#2F3852;
+  --tape:#E27499; --tape-soft:#3A2230; --buff:#5E5234; --buff-ink:#F1E6C8;
+  --good:#7CC4A6; --good-soft:#1D3530; --warn:#E8B75C; --warn-soft:#3A2F17;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans)}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+
+/* The brief: the one bold element */
+.brief{position:relative;margin:28px auto 8px;background:var(--surface);border:1px solid var(--line);
+  padding:28px 120px 26px 28px;overflow:hidden}
+.brief::after{content:"";position:absolute;top:-10px;bottom:-10px;right:52px;width:22px;background:var(--tape);
+  box-shadow:inset 3px 0 0 rgba(255,255,255,.18),inset -3px 0 0 rgba(0,0,0,.12)}
+.brief .matter{font:italic 15px/1.3 var(--serif);color:var(--muted);margin:0 0 6px}
+.brief h1{font:700 clamp(28px,5vw,44px)/1.1 var(--serif);margin:0;letter-spacing:-.01em}
+.brief .sub{margin:10px 0 0;color:var(--muted);max-width:56ch}
+.exams{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.exam{border:1px solid var(--line);padding:4px 10px;font-size:14px;background:var(--paper)}
+.exam b{font-family:var(--serif);font-size:18px;margin-right:4px}
+.exam.soon{border-color:var(--tape);background:var(--tape-soft)}
+
+nav.tabs{display:flex;gap:4px;margin:18px 0 0;border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:600;
+  border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--tape)}
+main{padding:22px 0 60px}
+[hidden]{display:none!important}
+h2{font:700 24px/1.2 var(--serif);margin:0 0 6px}
+h3{font:700 19px/1.25 var(--serif);margin:0}
+.lede{color:var(--muted);margin:0 0 20px;max-width:64ch}
+
+.btn{background:var(--ink);color:var(--paper);border:0;padding:9px 16px;cursor:pointer;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.tape{background:var(--tape);color:#fff}
+.btn.good{background:var(--good);color:var(--surface)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* Module folders */
+.folder{margin:0 0 26px}
+.folder-tab{display:inline-flex;gap:10px;align-items:baseline;background:var(--buff);color:var(--buff-ink);
+  padding:6px 14px 5px;border-radius:6px 6px 0 0}
+.folder-tab h3{font-size:17px}
+.folder-tab span{font-size:13px}
+.folder-body{border:1px solid var(--line);border-top:3px solid var(--buff);background:var(--surface)}
+.meter{height:6px;background:var(--line)}
+.meter i{display:block;height:100%;background:var(--good);transition:width .3s}
+.item{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.ch{font:700 20px/1 var(--serif);color:var(--muted);text-align:center}
+.item a.title{font-weight:600;text-decoration:none}
+.item a.title:hover{text-decoration:underline}
+.meta{font-size:13px;color:var(--muted)}
+.flag{font-size:12px;font-weight:600;padding:1px 7px;margin-left:6px;background:var(--warn-soft);color:var(--warn)}
+.status{display:flex;border:1px solid var(--line)}
+.status button{border:0;background:transparent;padding:5px 9px;font-size:13px;cursor:pointer;color:var(--muted)}
+.status button+button{border-left:1px solid var(--line)}
+.status button[aria-pressed="true"][data-s="todo"]{background:var(--line);color:var(--ink)}
+.status button[aria-pressed="true"][data-s="reviewed"]{background:var(--warn-soft);color:var(--warn)}
+.status button[aria-pressed="true"][data-s="confident"]{background:var(--good-soft);color:var(--good)}
+.empty{padding:18px 16px;color:var(--muted)}
+.empty code,.notice code{background:var(--paper);padding:1px 5px;font-size:14px}
+.notice{border-left:4px solid var(--tape);background:var(--surface);padding:14px 16px;margin:0 0 20px}
+
+/* Flashcards */
+.decks{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin:0 0 18px}
+.deck{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);background:var(--surface);padding:12px 14px;cursor:pointer}
+.deck input{margin-top:4px;accent-color:var(--tape)}
+.deck small{display:block;color:var(--muted)}
+.study{max-width:660px}
+.progress{font-size:14px;color:var(--muted);margin:0 0 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--tape);padding:28px 26px;min-height:230px}
+.card .from{font-size:13px;color:var(--muted);margin:0 0 10px}
+.card .q{font:400 22px/1.4 var(--serif);margin:0}
+.card .a{margin:18px 0 0;padding-top:16px;border-top:1px dashed var(--line);font-size:17px}
+.card .a[hidden]{display:none}
+.answer-row{margin-top:14px}
+.keys{font-size:13px;color:var(--muted);margin-top:10px}
+.boxes{display:flex;gap:6px;margin:6px 0 18px;flex-wrap:wrap}
+.boxes span{font-size:13px;border:1px solid var(--line);padding:2px 8px;background:var(--surface)}
+
+/* Notes and search */
+.list{border:1px solid var(--line);background:var(--surface)}
+.list a{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;border-top:1px solid var(--line);text-decoration:none}
+.list a:first-child{border-top:0}
+.list a:hover{background:var(--paper)}
+.list a small{color:var(--muted);white-space:nowrap}
+.group-label{font:italic 16px var(--serif);color:var(--muted);margin:18px 0 6px}
+input[type="search"],input[type="text"],input[type="date"],input[type="url"]{width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--surface)}
+.hit{padding:12px 16px;border-top:1px solid var(--line)}
+.hit:first-child{border-top:0}
+.hit .k{font-size:12px;font-weight:600;color:var(--tape)}
+mark{background:var(--tape-soft);color:inherit}
+
+.settings{display:grid;gap:22px;max-width:620px}
+.settings label{display:block;font-weight:600;margin-bottom:6px}
+.exam-edit{display:grid;grid-template-columns:1fr 160px auto;gap:8px;margin-bottom:8px}
+footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding:16px 0 30px}
+
+@media (max-width:640px){
+  .brief{padding:22px 70px 22px 20px}
+  .brief::after{right:24px;width:16px}
+  .item{grid-template-columns:34px 1fr;row-gap:8px}
+  .item .status{grid-column:2}
+  .exam-edit{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brief">
+    <p class="matter">In the matter of</p>
+    <h1 id="hubTitle">Josh's revision</h1>
+    <p class="sub">Every poster, flashcard deck and note in one place. Your progress is saved in this browser.</p>
+    <div class="exams" id="examStrip"></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" aria-selected="true" data-tab="library">Posters</button>
+    <button role="tab" aria-selected="false" data-tab="cards">Flashcards</button>
+    <button role="tab" aria-selected="false" data-tab="notes">Notes and templates</button>
+    <button role="tab" aria-selected="false" data-tab="search">Search</button>
+    <button role="tab" aria-selected="false" data-tab="settings">Settings</button>
+  </nav>
+
+  <main>
+    <div id="loadNotice"></div>
+
+    <section id="tab-library" role="tabpanel">
+      <h2>Posters</h2>
+      <p class="lede">Mark each chapter as you go. Anything you marked more than a week ago (two weeks if confident) is flagged for another look.</p>
+      <div id="library"></div>
+    </section>
+
+    <section id="tab-cards" role="tabpanel" hidden>
+      <div id="deckPicker">
+        <h2>Flashcards</h2>
+        <p class="lede">Pick decks and study. Cards you know come back less often (after 1, 2, 4, 8, then 16 days); cards you miss come back the same session.</p>
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn ghost" id="selAll">Select all</button>
+          <button class="btn ghost" id="selNone">Clear</button>
+        </div>
+        <div class="decks" id="deckList"></div>
+        <div class="row">
+          <button class="btn tape" id="studyDue">Study due cards</button>
+          <button class="btn ghost" id="studyAll">Study every card</button>
+          <span class="meta" id="dueCount"></span>
+        </div>
+      </div>
+      <div id="studyView" class="study" hidden>
+        <p class="progress" id="studyProgress"></p>
+        <div class="card" aria-live="polite">
+          <p class="from" id="cardFrom"></p>
+          <p class="q" id="cardQ"></p>
+          <div class="a" id="cardA" hidden></div>
+        </div>
+        <div class="row answer-row" id="revealRow"><button class="btn" id="reveal">Show answer</button></div>
+        <div class="row answer-row" id="gradeRow" hidden>
+          <button class="btn good" id="knew">I knew it</button>
+          <button class="btn tape" id="missed">I didn't</button>
+        </div>
+        <p class="keys">Keys: space shows the answer, 1 = knew it, 2 = didn't.</p>
+        <div class="row"><button class="btn ghost" id="endStudy">Back to decks</button></div>
+      </div>
+      <div id="studyDone" class="study" hidden></div>
+    </section>
+
+    <section id="tab-notes" role="tabpanel" hidden>
+      <h2>Notes and templates</h2>
+      <p class="lede">These open on GitHub, where flowcharts render and every change you've made is kept in the file's History.</p>
+      <div id="notesList"></div>
+    </section>
+
+    <section id="tab-search" role="tabpanel" hidden>
+      <h2>Search</h2>
+      <p class="lede">Searches poster titles, every flashcard question and answer, and note titles.</p>
+      <input type="search" id="q" placeholder="e.g. Woollin, remoteness, counter-offer" aria-label="Search">
+      <p class="meta" id="ghSearch"></p>
+      <div class="list" id="results" style="margin-top:12px"></div>
+    </section>
+
+    <section id="tab-settings" role="tabpanel" hidden>
+      <h2>Settings</h2>
+      <div class="settings">
+        <div>
+          <label for="titleInput">Hub title</label>
+          <input type="text" id="titleInput">
+        </div>
+        <div>
+          <label>Exam dates</label>
+          <div id="examEdit"></div>
+          <button class="btn ghost" id="addExam">Add exam</button>
+        </div>
+        <div>
+          <label>Theme</label>
+          <div class="status" style="display:inline-flex" id="themePick">
+            <button data-t="auto">Match device</button><button data-t="light">Light</button><button data-t="dark">Dark</button>
+          </div>
+        </div>
+        <div>
+          <label>Back up progress</label>
+          <p class="meta" style="margin:0 0 8px">Progress lives in this browser only. Download a backup to move it to another device.</p>
+          <div class="row">
+            <button class="btn ghost" id="exportBtn">Download backup</button>
+            <label class="btn ghost" style="margin:0;font-weight:600">Restore backup<input type="file" id="importFile" accept="application/json" hidden></label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const MODULES = {
+  contract:"Contract", tort:"Tort", criminal:"Criminal", public:"Public",
+  land:"Land", "equity-trusts":"Equity and Trusts", "legal-system":"Legal System and Method"
+};
+const INTERVALS = [0,1,2,4,8,16];
+const DAY = 864e5;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const modName = m => MODULES[m] || (m.charAt(0).toUpperCase() + m.slice(1).replace(/-/g," "));
+
+/* ---------- storage ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("lawhub:"+k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("lawhub:"+k, JSON.stringify(v)); }catch(e){} }
+};
+
+let lib = {repo:"", branch:"main", posters:[], decks:[], notes:[]};
+let deckCache = {};
+
+/* ---------- theme, title, exams ---------- */
+function applyTheme(){
+  const t = store.get("theme","auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  document.querySelectorAll("#themePick button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === t));
+}
+function applyTitle(){
+  const t = store.get("title","Josh's revision");
+  $("#hubTitle").textContent = t; document.title = t; $("#titleInput").value = t;
+}
+function renderExams(){
+  const exams = store.get("exams",[]).filter(e => e.name && e.date).sort((a,b) => a.date.localeCompare(b.date));
+  const today = new Date(); today.setHours(0,0,0,0);
+  $("#examStrip").innerHTML = exams.map(e => {
+    const d = Math.round((new Date(e.date+"T00:00:00") - today)/DAY);
+    if (d < 0) return "";
+    return `<span class="exam${d<=14?" soon":""}"><b>${d}</b>${d===1?"day":"days"} to ${esc(e.name)}</span>`;
+  }).join("") || `<span class="meta">Add your exam dates in Settings to see a countdown here.</span>`;
+  $("#examEdit").innerHTML = store.get("exams",[]).map((e,i) =>
+    `<div class="exam-edit"><input type="text" aria-label="Exam name" data-i="${i}" data-f="name" value="${esc(e.name||"")}" placeholder="e.g. Contract SBAQ">
+     <input type="date" aria-label="Exam date" data-i="${i}" data-f="date" value="${esc(e.date||"")}">
+     <button class="btn ghost" data-del="${i}">Remove</button></div>`).join("");
+}
+
+/* ---------- loading ---------- */
+function detectRepo(){
+  const h = location.hostname;
+  if (!h.endsWith(".github.io")) return "";
+  const owner = h.replace(".github.io","");
+  const seg = location.pathname.split("/").filter(Boolean)[0];
+  return seg && !seg.includes(".") ? owner+"/"+seg : owner+"/"+h;
+}
+async function loadFromApi(repo){
+  const r = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`);
+  if (!r.ok) throw new Error("api");
+  const tree = (await r.json()).tree.map(t => t.path);
+  const pretty = s => { s = s.replace(/[_\-]+/g," ").trim(); return s.charAt(0).toUpperCase()+s.slice(1); };
+  const stem = p => p.split("/").pop().replace(/\.[^.]+$/,"");
+  const ch = p => { const m = stem(p).match(/ch(?:apter)?[\s_\-.]*0*(\d+)/i); return m ? +m[1] : null; };
+  return {
+    repo, branch:"HEAD",
+    posters: tree.filter(p => /^posters\/.+\.html?$/i.test(p)).map(p => ({path:p, module:p.split("/").length>2?p.split("/")[1]:"general", title:pretty(stem(p)), chapter:ch(p)})),
+    decks: tree.filter(p => /^flashcards\/.+\.csv$/i.test(p)).map(p => ({path:p, name:pretty(stem(p)), module:stem(p).split("-")[0].toLowerCase(), count:null})),
+    notes: tree.filter(p => /^(notes|templates|career)\/.+\.md$/i.test(p)).map(p => { const s=p.split("/")[0]; return {path:p, section:s, module:s==="notes"&&p.split("/").length>2?p.split("/")[1]:s, title:pretty(stem(p)), readme:/readme\.md$/i.test(p)}; })
+  };
+}
+async function load(){
+  if (location.protocol === "file:"){
+    $("#loadNotice").innerHTML = `<div class="notice">This page reads your files from your published site, so it doesn't work when opened straight from your computer. Open it at your GitHub Pages address instead (see <code>START-HERE.md</code>, step 5).</div>`;
+  }
+  try{
+    const r = await fetch("library.json", {cache:"no-store"});
+    if (!r.ok) throw new Error();
+    lib = Object.assign(lib, await r.json());
+    if (!lib.repo) lib.repo = detectRepo();
+  }catch(e){
+    const repo = detectRepo();
+    if (repo){ try{ lib = await loadFromApi(repo); }catch(err){} }
+  }
+  const when = lib.generated ? new Date(lib.generated).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}) : "";
+  $("#foot").innerHTML = (lib.repo ? `Files from <a href="https://github.com/${esc(lib.repo)}">${esc(lib.repo)}</a>. ` : "") + (when ? `Library last updated ${esc(when)}.` : "");
+  renderLibrary(); renderDecks(); renderNotes();
+}
+
+/* ---------- posters ---------- */
+function posterState(p){ return store.get("poster:"+p, {status:"todo"}); }
+function ago(ts){
+  const d = Math.floor((Date.now()-ts)/DAY);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : d + " days ago";
+}
+function renderLibrary(){
+  const el = $("#library");
+  const byMod = {};
+  Object.keys(MODULES).forEach(m => byMod[m] = []);
+  lib.posters.forEach(p => (byMod[p.module] = byMod[p.module] || []).push(p));
+  const order = Object.keys(byMod).sort((a,b) => (byMod[b].length>0) - (byMod[a].length>0));
+  el.innerHTML = order.map(m => {
+    const items = byMod[m].sort((a,b) => (a.chapter ?? 999) - (b.chapter ?? 999) || a.title.localeCompare(b.title));
+    const done = items.filter(p => posterState(p.path).status !== "todo").length;
+    const pct = items.length ? Math.round(done/items.length*100) : 0;
+    const rows = items.map(p => {
+      const s = posterState(p.path);
+      const limit = s.status === "confident" ? 14 : 7;
+      const stale = s.status !== "todo" && s.reviewed && (Date.now()-s.reviewed)/DAY > limit;
+      const meta = s.opened ? "Opened " + ago(s.opened) : "Not opened yet";
+      return `<div class="item">
+        <div class="ch" aria-label="Chapter">${p.chapter ?? "–"}</div>
+        <div><a class="title" href="${esc(encodeURI(p.path))}" target="_blank" rel="noopener" data-open="${esc(p.path)}">${esc(p.title)}</a>
+          ${stale ? `<span class="flag">Due another look</span>` : ""}
+          <div class="meta">${meta}</div></div>
+        <div class="status" role="group" aria-label="Progress for ${esc(p.title)}">
+          ${["todo","reviewed","confident"].map(k => `<button data-s="${k}" data-p="${esc(p.path)}" aria-pressed="${s.status===k}">${{todo:"To do",reviewed:"Reviewed",confident:"Confident"}[k]}</button>`).join("")}
+        </div></div>`;
+    }).join("");
+    return `<div class="folder">
+      <div class="folder-tab"><h3>${esc(modName(m))}</h3><span>${items.length ? `${done} of ${items.length} reviewed` : "No posters yet"}</span></div>
+      <div class="folder-body">${items.length ? `<div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>${rows}` :
+        `<div class="empty">Upload poster files to <code>posters/${esc(m)}/</code> and they'll appear here.</div>`}</div></div>`;
+  }).join("");
+}
+$("#library").addEventListener("click", e => {
+  const a = e.target.closest("[data-open]");
+  if (a){ const s = posterState(a.dataset.open); s.opened = Date.now(); store.set("poster:"+a.dataset.open, s); setTimeout(renderLibrary, 300); return; }
+  const b = e.target.closest("[data-s]");
+  if (b){ const s = posterState(b.dataset.p); s.status = b.dataset.s; s.reviewed = b.dataset.s === "todo" ? null : Date.now(); store.set("poster:"+b.dataset.p, s); renderLibrary(); }
+});
+
+/* ---------- flashcards ---------- */
+function parseCSV(text){
+  const rows = []; let row = [], f = "", q = false;
+  text = text.replace(/^\uFEFF/,"");
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ","){ row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r"){ if (c === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f !== "" || row.length){ row.push(f); rows.push(row); }
+  const clean = rows.filter(r => r.some(x => x.trim()));
+  if (clean.length && /^question$/i.test(clean[0][0].trim())) clean.shift();
+  return clean.filter(r => r.length >= 2 && r[0].trim()).map(r => ({q:r[0].trim(), a:r.slice(1).join(",").trim()}));
+}
+async function getDeck(path){
+  if (deckCache[path]) return deckCache[path];
+  const r = await fetch(encodeURI(path), {cache:"no-store"});
+  if (!r.ok) throw new Error("deck");
+  return deckCache[path] = parseCSV(await r.text());
+}
+const cardKey = (path,q) => "card:" + path + "::" + q;
+function isDue(path,q){ const s = store.get(cardKey(path,q), null); return !s || s.due <= Date.now(); }
+
+async function renderDecks(){
+  const el = $("#deckList");
+  if (!lib.decks.length){ el.innerHTML = `<div class="empty">Add <code>.csv</code> files to the <code>flashcards</code> folder and they'll appear here.</div>`; return; }
+  const chosen = store.get("decks", lib.decks.map(d => d.path));
+  const decks = [...lib.decks].sort((a,b) => a.module.localeCompare(b.module) || a.name.localeCompare(b.name));
+  el.innerHTML = decks.map(d => `<label class="deck"><input type="checkbox" value="${esc(d.path)}" ${chosen.includes(d.path)?"checked":""}>
+    <span><b>${esc(d.name)}</b><small data-count="${esc(d.path)}">${d.count != null ? d.count + " cards" : "…"}</small></span></label>`).join("");
+  await Promise.all(decks.map(d => getDeck(d.path).catch(() => [])));
+  decks.forEach(d => {
+    const cards = deckCache[d.path] || [];
+    const due = cards.filter(c => isDue(d.path,c.q)).length;
+    const small = el.querySelector(`[data-count="${CSS.escape(d.path)}"]`);
+    if (small) small.textContent = `${cards.length} cards, ${due} due`;
+  });
+  updateDueCount();
+}
+function selectedDecks(){ return [...document.querySelectorAll("#deckList input:checked")].map(i => i.value); }
+function updateDueCount(){
+  const sel = selectedDecks();
+  store.set("decks", sel);
+  let due = 0, all = 0;
+  sel.forEach(p => (deckCache[p]||[]).forEach(c => { all++; if (isDue(p,c.q)) due++; }));
+  $("#dueCount").textContent = sel.length ? `${due} due of ${all} selected` : "No decks selected";
+  $("#studyDue").disabled = !due; $("#studyAll").disabled = !all;
+}
+$("#deckList").addEventListener("change", updateDueCount);
+$("#selAll").onclick = () => { document.querySelectorAll("#deckList input").forEach(i => i.checked = true); updateDueCount(); };
+$("#selNone").onclick = () => { document.querySelectorAll("#deckList input").forEach(i => i.checked = false); updateDueCount(); };
+
+let session = null;
+function shuffle(a){ for (let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function startStudy(onlyDue){
+  const cards = [];
+  selectedDecks().forEach(p => (deckCache[p]||[]).forEach(c => { if (!onlyDue || isDue(p,c.q)) cards.push({...c, path:p}); }));
+  if (!cards.length) return;
+  session = {queue: shuffle(cards), total: cards.length, knew: 0, missed: 0, retried: new Set()};
+  $("#deckPicker").hidden = true; $("#studyDone").hidden = true; $("#studyView").hidden = false;
+  showCard();
+}
+function deckLabel(path){ const d = lib.decks.find(x => x.path === path); return d ? d.name : path; }
+function showCard(){
+  const c = session.queue[0];
+  if (!c) return finishStudy();
+  $("#studyProgress").textContent = `Card ${session.knew + session.missed + 1} of ${session.total + session.retried.size}, ${session.queue.length} left in this session`;
+  $("#cardFrom").textContent = deckLabel(c.path);
+  $("#cardQ").textContent = c.q;
+  $("#cardA").textContent = c.a; $("#cardA").hidden = true;
+  $("#revealRow").hidden = false; $("#gradeRow").hidden = true;
+  $("#reveal").focus();
+}
+function reveal(){ if (!session || !$("#cardA").hidden) return; $("#cardA").hidden = false; $("#revealRow").hidden = true; $("#gradeRow").hidden = false; $("#knew").focus(); }
+function grade(knew){
+  if (!session || $("#cardA").hidden) return;
+  const c = session.queue.shift();
+  const k = cardKey(c.path, c.q);
+  const s = store.get(k, {box:0, due:0});
+  if (knew){ s.box = Math.min(s.box + 1, 5); s.due = Date.now() + INTERVALS[s.box]*DAY; session.knew++; }
+  else {
+    s.box = 1; s.due = Date.now(); session.missed++;
+    if (!session.retried.has(k)){ session.retried.add(k); session.queue.push(c); }
+  }
+  store.set(k, s);
+  showCard();
+}
+function finishStudy(){
+  $("#studyView").hidden = true;
+  const d = $("#studyDone"); d.hidden = false;
+  const boxes = [0,0,0,0,0,0];
+  selectedDecks().forEach(p => (deckCache[p]||[]).forEach(c => boxes[store.get(cardKey(p,c.q),{box:0}).box]++));
+  d.innerHTML = `<h2>Session finished</h2>
+    <p class="lede">You knew ${session.knew} and missed ${session.missed}. Missed cards were shown again once and will come back tomorrow.</p>
+    <div class="boxes">${boxes.map((n,i) => `<span>${i===0?"New":"Box "+i}: ${n}</span>`).join("")}</div>
+    <button class="btn" id="backDecks">Back to decks</button>`;
+  $("#backDecks").onclick = endStudy;
+  session = null;
+}
+function endStudy(){ session = null; $("#studyView").hidden = true; $("#studyDone").hidden = true; $("#deckPicker").hidden = false; renderDecks(); }
+$("#studyDue").onclick = () => startStudy(true);
+$("#studyAll").onclick = () => startStudy(false);
+$("#reveal").onclick = reveal;
+$("#knew").onclick = () => grade(true);
+$("#missed").onclick = () => grade(false);
+$("#endStudy").onclick = endStudy;
+document.addEventListener("keydown", e => {
+  if (!session || $("#studyView").hidden || e.target.matches("input,textarea")) return;
+  if (e.code === "Space"){ e.preventDefault(); reveal(); }
+  else if (e.key === "1") grade(true);
+  else if (e.key === "2") grade(false);
+});
+
+/* ---------- notes ---------- */
+function ghLink(path){
+  return lib.repo ? `https://github.com/${lib.repo}/blob/${lib.branch && lib.branch !== "HEAD" ? lib.branch : "main"}/${encodeURI(path)}` : encodeURI(path);
+}
+function renderNotes(){
+  const el = $("#notesList");
+  if (!lib.notes.length){ el.innerHTML = `<div class="empty">No notes found yet.</div>`; return; }
+  const groups = {};
+  lib.notes.forEach(n => {
+    const g = n.section === "notes" ? modName(n.module) : n.section === "templates" ? "Templates" : "Career";
+    (groups[g] = groups[g] || []).push(n);
+  });
+  el.innerHTML = Object.entries(groups).map(([g, ns]) => `<p class="group-label">${esc(g)}</p><div class="list">${
+    ns.sort((a,b) => (b.readme - a.readme) || a.path.localeCompare(b.path)).map(n =>
+      `<a href="${esc(ghLink(n.path))}" target="_blank" rel="noopener"><span>${esc(n.readme ? "Overview" : n.title)}</span><small>${esc(n.path.split("/").pop())}</small></a>`).join("")
+  }</div>`).join("");
+}
+
+/* ---------- search ---------- */
+function hl(text, terms){
+  let out = esc(text);
+  terms.forEach(t => { if (t) out = out.replace(new RegExp("(" + t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + ")","gi"), "<mark>$1</mark>"); });
+  return out;
+}
+async function runSearch(){
+  const raw = $("#q").value.trim();
+  const terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  const out = $("#results");
+  $("#ghSearch").innerHTML = raw && lib.repo ? `To search inside the text of every note, <a href="https://github.com/search?q=${encodeURIComponent("repo:"+lib.repo+" "+raw)}&type=code" target="_blank" rel="noopener">search the repository on GitHub</a>.` : "";
+  if (!terms.length){ out.innerHTML = ""; return; }
+  await Promise.all(lib.decks.map(d => getDeck(d.path).catch(() => [])));
+  const match = s => { s = s.toLowerCase(); return terms.every(t => s.includes(t)); };
+  const hits = [];
+  lib.posters.forEach(p => { if (match(p.title + " " + p.path)) hits.push(`<a class="hit" href="${esc(encodeURI(p.path))}" target="_blank" rel="noopener" style="display:block;text-decoration:none"><div class="k">${esc(modName(p.module))} poster</div>${hl(p.title, terms)}</a>`); });
+  lib.notes.forEach(n => { if (match(n.title + " " + n.path)) hits.push(`<a class="hit" href="${esc(ghLink(n.path))}" target="_blank" rel="noopener" style="display:block;text-decoration:none"><div class="k">Note</div>${hl(n.title, terms)}</a>`); });
+  lib.decks.forEach(d => (deckCache[d.path]||[]).forEach(c => { if (match(c.q + " " + c.a)) hits.push(`<div class="hit"><div class="k">Flashcard from ${esc(d.name)}</div><b>${hl(c.q, terms)}</b><div class="meta">${hl(c.a, terms)}</div></div>`); }));
+  out.innerHTML = hits.slice(0,80).join("") || `<div class="empty">Nothing matches "${esc(raw)}". Try a single case name or keyword.</div>`;
+}
+let st; $("#q").addEventListener("input", () => { clearTimeout(st); st = setTimeout(runSearch, 150); });
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  document.querySelectorAll("main > section").forEach(s => s.hidden = s.id !== "tab-" + b.dataset.tab);
+  if (b.dataset.tab === "search") $("#q").focus();
+}));
+
+/* ---------- settings ---------- */
+$("#titleInput").addEventListener("input", e => { store.set("title", e.target.value || "Revision hub"); applyTitle(); });
+$("#addExam").onclick = () => { const ex = store.get("exams",[]); ex.push({name:"",date:""}); store.set("exams", ex); renderExams(); };
+$("#examEdit").addEventListener("input", e => {
+  const i = e.target.dataset.i; if (i === undefined) return;
+  const ex = store.get("exams",[]); ex[i][e.target.dataset.f] = e.target.value; store.set("exams", ex);
+  const all = store.get("exams",[]).filter(x => x.name && x.date);
+  const today = new Date(); today.setHours(0,0,0,0);
+  $("#examStrip").innerHTML = all.sort((a,b)=>a.date.localeCompare(b.date)).map(x => { const d = Math.round((new Date(x.date+"T00:00:00")-today)/DAY); return d < 0 ? "" : `<span class="exam${d<=14?" soon":""}"><b>${d}</b>${d===1?"day":"days"} to ${esc(x.name)}</span>`; }).join("");
+});
+$("#examEdit").addEventListener("click", e => {
+  const i = e.target.dataset.del; if (i === undefined) return;
+  const ex = store.get("exams",[]); ex.splice(i,1); store.set("exams", ex); renderExams();
+});
+$("#themePick").addEventListener("click", e => { const t = e.target.dataset.t; if (t){ store.set("theme", t); applyTheme(); } });
+$("#exportBtn").onclick = () => {
+  const data = {};
+  try{ for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (k.startsWith("lawhub:")) data[k] = localStorage.getItem(k); } }catch(e){}
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:"application/json"}));
+  a.download = "revision-progress-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("#importFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    Object.entries(data).forEach(([k,v]) => { if (k.startsWith("lawhub:")) localStorage.setItem(k, v); });
+    applyTheme(); applyTitle(); renderExams(); renderLibrary(); renderDecks();
+    alert("Progress restored.");
+  }catch(err){ alert("That file isn't a revision hub backup. Choose the .json file you downloaded from Settings."); }
+});
+
+applyTheme(); applyTitle(); renderExams(); load();
+})();
+</script>
+</body>
+</html>

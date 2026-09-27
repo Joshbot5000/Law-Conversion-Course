@@ -1,0 +1,161 @@
+{
+  "repo": "",
+  "branch": "main",
+  "generated": "2026-09-27T11:59:05+00:00",
+  "posters": [],
+  "decks": [
+    {
+      "path": "flashcards/contract-agreement.csv",
+      "name": "Contract agreement",
+      "module": "contract",
+      "count": 14
+    },
+    {
+      "path": "flashcards/criminal-general-principles.csv",
+      "name": "Criminal general principles",
+      "module": "criminal",
+      "count": 15
+    },
+    {
+      "path": "flashcards/tort-negligence-core.csv",
+      "name": "Tort negligence core",
+      "module": "tort",
+      "count": 12
+    }
+  ],
+  "notes": [
+    {
+      "path": "notes/README.md",
+      "section": "notes",
+      "module": "general",
+      "title": "Notes",
+      "readme": true
+    },
+    {
+      "path": "notes/contract/README.md",
+      "section": "notes",
+      "module": "contract",
+      "title": "Contract Law",
+      "readme": true
+    },
+    {
+      "path": "notes/contract/ch01-agreement-map.md",
+      "section": "notes",
+      "module": "contract",
+      "title": "Chapter 1: Agreement and contractual intention",
+      "readme": false
+    },
+    {
+      "path": "notes/criminal/README.md",
+      "section": "notes",
+      "module": "criminal",
+      "title": "Criminal Law",
+      "readme": true
+    },
+    {
+      "path": "notes/criminal/liability-map.md",
+      "section": "notes",
+      "module": "criminal",
+      "title": "Building criminal liability: actus reus, mens rea, causation",
+      "readme": false
+    },
+    {
+      "path": "notes/equity-trusts/README.md",
+      "section": "notes",
+      "module": "equity-trusts",
+      "title": "Equity and Trusts",
+      "readme": true
+    },
+    {
+      "path": "notes/land/README.md",
+      "section": "notes",
+      "module": "land",
+      "title": "Land Law",
+      "readme": true
+    },
+    {
+      "path": "notes/legal-system/README.md",
+      "section": "notes",
+      "module": "legal-system",
+      "title": "Legal System and Method",
+      "readme": true
+    },
+    {
+      "path": "notes/public/README.md",
+      "section": "notes",
+      "module": "public",
+      "title": "Public Law",
+      "readme": true
+    },
+    {
+      "path": "notes/tort/README.md",
+      "section": "notes",
+      "module": "tort",
+      "title": "Tort Law",
+      "readme": true
+    },
+    {
+      "path": "notes/tort/negligence-map.md",
+      "section": "notes",
+      "module": "tort",
+      "title": "Negligence: the whole route on one page",
+      "readme": false
+    },
+    {
+      "path": "templates/README.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "Templates",
+      "readme": true
+    },
+    {
+      "path": "templates/case-note.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "[Case name] [year] [citation]",
+      "readme": false
+    },
+    {
+      "path": "templates/chapter-notes.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "[Module] \u2014 Chapter [N]: [Title]",
+      "readme": false
+    },
+    {
+      "path": "templates/pq-contract.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "Problem-question skeleton: contract (formation \u2192 breach \u2192 remedies)",
+      "readme": false
+    },
+    {
+      "path": "templates/pq-criminal-homicide.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "Problem-question skeleton: homicide",
+      "readme": false
+    },
+    {
+      "path": "templates/pq-negligence.md",
+      "section": "templates",
+      "module": "templates",
+      "title": "Problem-question skeleton: negligence",
+      "readme": false
+    },
+    {
+      "path": "career/README.md",
+      "section": "career",
+      "module": "career",
+      "title": "Career and commercial awareness",
+      "readme": true
+    },
+    {
+      "path": "career/commercial-awareness/TEMPLATE.md",
+      "section": "career",
+      "module": "career",
+      "title": "[Headline in plain English]",
+      "readme": false
+    }
+  ]
+}
