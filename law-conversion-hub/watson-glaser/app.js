@@ -10,11 +10,11 @@
   const PER_Q = Math.round(REAL.minutes * 60 / REAL.items); // 45 seconds
   const MIX = { inference: 5, assumptions: 12, deduction: 5, interpretation: 6, arguments: 12 };
   const META = {
-    inference: { name: 'Inference', blurb: 'Rate how far a statement goes beyond the facts, on a five-point scale from True to False.', prompt: 'Proposed inference', tag: 'Statement of facts', color: '#29477a' },
-    assumptions: { name: 'Recognising assumptions', blurb: 'Spot what the speaker is taking for granted, and what they are not.', prompt: 'Proposed assumption', tag: 'Statement', color: '#4f7cbd' },
-    deduction: { name: 'Deduction', blurb: 'Decide whether a conclusion must follow from the statements, even if it sounds odd.', prompt: 'Proposed conclusion', tag: 'Statements', color: '#b23c66' },
-    interpretation: { name: 'Interpretation', blurb: 'Decide whether a conclusion follows beyond reasonable doubt from the evidence given.', prompt: 'Proposed conclusion', tag: 'Passage', color: '#c27a92' },
-    arguments: { name: 'Evaluating arguments', blurb: 'Judge each argument strong or weak: is it important and directly about the question?', prompt: 'Argument', tag: 'Question', color: '#8a96a8' }
+    inference: { red: 'Drawing conclusions', name: 'Inference', blurb: 'Rate how far a statement goes beyond the facts, on a five-point scale from True to False.', prompt: 'Proposed inference', tag: 'Statement of facts', color: '#29477a' },
+    assumptions: { red: 'Recognising assumptions', name: 'Recognising assumptions', blurb: 'Spot what the speaker is taking for granted, and what they are not.', prompt: 'Proposed assumption', tag: 'Statement', color: '#4f7cbd' },
+    deduction: { red: 'Drawing conclusions', name: 'Deduction', blurb: 'Decide whether a conclusion must follow from the statements, even if it sounds odd.', prompt: 'Proposed conclusion', tag: 'Statements', color: '#b23c66' },
+    interpretation: { red: 'Drawing conclusions', name: 'Interpretation', blurb: 'Decide whether a conclusion follows beyond reasonable doubt from the evidence given.', prompt: 'Proposed conclusion', tag: 'Passage', color: '#c27a92' },
+    arguments: { red: 'Evaluating arguments', name: 'Evaluating arguments', blurb: 'Judge each argument strong or weak: is it important and directly about the question?', prompt: 'Argument', tag: 'Question', color: '#8a96a8' }
   };
   const INSTR = {
     inference: 'Treat the passage as true. Rate each statement: True, Probably true, Insufficient data, Probably false or False. You may use common knowledge almost everyone has.',
@@ -126,7 +126,7 @@
     const mixKey = WG.SECTIONS.map(s => '<span><i style="background:' + META[s].color + '"></i>' + esc(META[s].name) + ' ' + MIX[s] + '</span>').join('');
     const cards = WG.SECTIONS.map((s, i) => {
       const st = S.sections[s] || { n: 0, c: 0 };
-      return '<div class="card"><h3><span class="n">' + (i + 1) + '</span>' + esc(META[s].name) + '</h3><p>' + esc(META[s].blurb) + '</p>' +
+      return '<div class="card"><div class="eyebrow">' + esc(META[s].red) + '</div><h3 style="margin-top:-4px"><span class="n">' + (i + 1) + '</span>' + esc(META[s].name) + '</h3><p>' + esc(META[s].blurb) + '</p>' +
         '<div class="stat"><div class="meter"><i style="width:' + pct(st.c, st.n) + '%"></i></div><span>' + (st.n ? pct(st.c, st.n) + '% of ' + st.n : 'Not started') + '</span></div>' +
         '<div class="acts"><button class="btn primary" data-go="section" data-arg="' + s + '">Practise</button><a class="btn" href="#learn-' + s + '">Learn</a></div></div>';
     }).join('');
@@ -394,7 +394,8 @@
         'Find the sentence in the passage the statement is about.',
         'Is it settled for certain? If the facts force it, it is True. If the facts contradict it, it is False.',
         'Not certain? Ask which way the passage leans. Leans towards it: Probably true. Leans against it: Probably false.',
-        'Nothing in the passage points either way: Insufficient data.'
+        'Nothing in the passage points either way: Insufficient data.',
+        'Quick order: first ask whether it is True, Insufficient data or False. Only if none of those fits, decide between Probably true and Probably false.'
       ],
       traps: [
         'Using your own knowledge or opinions. You may only use common knowledge almost everyone has, never specialist knowledge or guesses about this situation.',
@@ -423,6 +424,7 @@
       what: 'You get a few statements, then proposed conclusions. You decide whether each conclusion must follow from the statements. This is strict logic: "probably" is not enough, and real-world plausibility does not matter.',
       method: [
         'Take every statement as true, even if it sounds unlikely or you disagree.',
+        'Reframe it: "If it is true that [the statements], is it then definitely true that [the conclusion]?"',
         'Try to break the conclusion: can you picture one situation where all the statements are true but the conclusion is false? If yes, it does not follow.',
         'For "all / no / some" statements, follow one member through the statements, or sketch overlapping circles.',
         'For "if / then" statements, mark the "if" part and the "then" part, and use the table below.',
@@ -442,7 +444,8 @@
         'Pin down exactly what the passage says, including who and what it covers.',
         'For numbers, do the sums. Check whether the conclusion is about a number or a proportion, and which year or group.',
         'Ask whether the conclusion needs anything the passage does not give: a cause, a prediction, a wider group, or a "why".',
-        'If it does, it does not follow. If the passage settles it, it follows.'
+        'If it does, it does not follow. If the passage settles it, it follows.',
+        'Beyond a reasonable doubt is a higher bar than "probably true", but lower than the strict "must be true" of deduction.'
       ],
       traps: [
         'A number and a proportion moving in opposite directions.',
@@ -450,6 +453,12 @@
         'Reading a cause into a link ("people who walk are less stressed" does not mean walking reduces stress).',
         'Stretching one survey, office or city to everyone.',
         'Treating "on average" as "every single one".'
+      ],
+      fallacies: [
+        ['The reason fallacy', 'Giving a reason or cause for something when the passage never says why it happened.'],
+        ['The indefinite pronoun fallacy', 'Using "all", "none", "every" or "always" where the passage only supports "some", "most" or "on average".'],
+        ['The correlation-causation fallacy', 'Concluding that one thing causes another when the passage only shows they go together.'],
+        ['Jumping to conclusions', 'Adding information that is not in the passage, such as predictions or claims about a wider group.']
       ]
     },
     arguments: {
@@ -461,6 +470,7 @@
         'Does the reason really support the Yes or No in front of it? If it points the other way, it is weak.',
         'Both tests passed: strong. Strong arguments can be on both sides at once.'
       ],
+      should: 'When a question begins with "Should", it means: would the proposed action promote the general welfare of the people in the country? Judge each argument by how well it supports the side (Yes or No) it is given for.',
       traps: [
         'Letting your own opinion on the question decide.',
         'Marking an argument weak because you do not believe it. You must treat it as true.',
@@ -469,6 +479,57 @@
       ]
     }
   };
+  /* Classic sample questions (from Josh's cheat sheet). Answers are the
+   * cheat sheet's; the explanations were written and checked here. */
+  const CLASSIC = {
+    inference: {
+      passage: 'Two hundred students in their early teens voluntarily attended a recent weekend student conference in a city in England. At this conference, the topics of race equality and means of achieving lasting world peace were discussed, since these were the problems the students selected as being most vital in today’s world.',
+      items: [
+        ['As a group, the students who attended this conference showed a keener interest in broad social problems than do most other students in their early teens.', 'PT', 'They gave up a weekend voluntarily and chose these topics themselves. That makes a keener-than-average interest likely, but the passage cannot prove it, so it is Probably true.'],
+        ['The majority of the students had not previously discussed the conference topics in their schools.', 'PF', 'They picked these topics as the most vital problems in the world, which suggests they already knew about and had talked about them. That points against this statement without ruling it out, so it is Probably false.'],
+        ['The students came from all parts of the country.', 'ID', 'The passage only says where the conference was held, not where the students came from. Nothing tips the balance, so it is Insufficient data.'],
+        ['The students discussed mainly industrial relations problems.', 'F', 'The passage says the topics were race equality and world peace, chosen as the most vital problems. "Mainly industrial relations" contradicts that, so it is False.'],
+        ['Some teenage students felt it worthwhile to discuss problems of race equality and ways of achieving world peace.', 'T', 'The students chose these topics as the most vital problems and discussed them at a conference they attended voluntarily. So at least some teenagers felt it worthwhile. This must be true.']
+      ]
+    },
+    assumptions: {
+      passage: '"We need to save time in getting there, so we’d better go by plane."',
+      items: [
+        ['Going by plane will take less time than going by some other means of transport.', 'made', 'Flip it: if the plane would NOT save time, choosing it "to save time" makes no sense. So it is assumed.'],
+        ['There is a plane service available to us for at least part of the distance to the destination.', 'made', 'You cannot sensibly suggest going by plane unless you think a plane is available. Flip it and the suggestion collapses. Assumed.'],
+        ['Travel by plane is more convenient than travel by train.', 'not', 'The speaker’s only reason is saving time, not convenience. Flip it ("the train is more convenient") and the plane can still be the faster choice. Not assumed.']
+      ]
+    },
+    deduction: {
+      passage: 'Some Sundays are rainy. All rainy days are boring.',
+      items: [
+        ['No clear days are boring.', 'not', 'The statements only tell you about rainy days. They say nothing about clear days, so clear days could be boring too. Not guaranteed, so it does not follow.'],
+        ['Some Sundays are boring.', 'follows', 'At least one Sunday is rainy. Every rainy day is boring. So that Sunday is boring, which means at least one Sunday is boring. It follows.'],
+        ['Some Sundays are not boring.', 'not', '"Some Sundays are rainy" allows that every Sunday is rainy (some can mean all). If they all are, every Sunday is boring. Not guaranteed, so it does not follow.']
+      ]
+    },
+    interpretation: {
+      passage: 'A study of vocabulary growth in children from ages eight months to six years old shows that the size of spoken vocabulary increases from zero words at age eight months to 2,562 words at age six years.',
+      items: [
+        ['None of the children in this study had learned to talk by the age of six months.', 'follows', 'Their spoken vocabulary was zero words at eight months. Children do not lose the ability to talk between six and eight months, so beyond reasonable doubt none could talk at six months. It follows.'],
+        ['Vocabulary growth is slowest during the period when children are learning to walk.', 'not', 'The passage gives only the start and end figures. It says nothing about the rate in between, or about walking. This adds information the passage does not give, so it does not follow.']
+      ]
+    },
+    arguments: {
+      passage: 'Should all young adults in the United Kingdom go on to higher education at university?',
+      items: [
+        ['Yes; university provides an opportunity for them to wear university scarves.', 'weak', 'Even if true, wearing a scarf is a trivial reason for a decision this big. Not important, so weak.'],
+        ['No; a large percentage of young adults do not have enough ability or interest to derive any benefit from university training.', 'strong', 'Treat it as true. If many would get no benefit, sending ALL of them is a serious problem for the general welfare. Important and directly about the question, so strong.'],
+        ['No; excessive studying permanently warps an individual’s personality.', 'weak', 'Treat it as true. It is about excessive studying, but going to university does not require excessive studying. So it does not directly address whether everyone should go. Weak.']
+      ]
+    }
+  };
+  function classicHTML(sec) {
+    const c = CLASSIC[sec];
+    const it0 = { section: sec, passage: c.passage, question: c.passage };
+    return '<h2>Classic example</h2><p class="lede" style="margin-bottom:12px">The sample from your cheat sheet, with each answer explained.</p><div class="example" style="margin-bottom:28px">' + passageHTML(it0) +
+      c.items.map((x, i) => '<div class="stmt"><p>' + (i + 1) + '. ' + esc(x[0]) + '</p><details class="reveal"><summary>Show answer</summary><div class="fb"><div class="verdict" style="background:var(--accent-soft);color:var(--accent)">Answer: ' + esc(WG.labelOf(sec, x[1])) + '</div><div class="body"><p>' + esc(x[2]) + '</p></div></div></details></div>').join('') + '</div>';
+  }
   function learnExample(sec) {
     const set = WG.generateSet(sec, {});
     const it0 = set.items[0];
@@ -503,13 +564,15 @@
           ['Either P or Q, or both; P', 'Nothing about Q (trap)', 'bad']
         ].map(r => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td class="' + (r[2] === 'ok' ? 'ok-t' : 'bad-t') + '">' + (r[2] === 'ok' ? '✔' : '!') + '</td></tr>').join('') + '</tbody></table></div>';
     }
+    const extra = (g.should ? '<h3>What "should" means</h3><p>' + esc(g.should) + '</p>' : '') +
+      (g.fallacies ? '<h3>The four fallacies to watch for</h3><div class="scale">' + g.fallacies.map(f => '<div><b>' + esc(f[0]) + '</b><span>' + esc(f[1]) + '</span></div>').join('') + '</div>' : '');
     const st = S.sections[sec];
-    $app.innerHTML = '<div class="eyebrow">Learn</div><h1 style="font-family:var(--f-display);font-size:2rem;margin-top:6px">' + esc(META[sec].name) + '</h1><div class="tabs">' + tabs + '</div>' +
+    $app.innerHTML = '<div class="eyebrow">Learn \u00B7 ' + esc(META[sec].red) + '</div><h1 style="font-family:var(--f-display);font-size:2rem;margin-top:6px">' + esc(META[sec].name) + '</h1><div class="tabs">' + tabs + '</div>' +
       '<div class="guide"><section><h2>How it works</h2><p>' + esc(g.what) + '</p>' + scale +
       '<h3>Method</h3><ol>' + g.method.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
-      '<h3>Traps</h3><ul>' + g.traps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' + cheat +
+      '<h3>Traps</h3><ul>' + g.traps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' + extra + cheat +
       '<div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap"><button class="btn primary" data-go="section" data-arg="' + sec + '">Practise ' + esc(META[sec].name.toLowerCase()) + '</button>' + (st ? '<span class="pace" style="align-self:center">Your accuracy: ' + pct(st.c, st.n) + '% of ' + st.n + '</span>' : '') + '</div></section>' +
-      '<section><h2>Worked example</h2><p class="lede" style="margin-bottom:12px">Try each one in your head first, then open the explanation.</p><div id="ex">' + learnExample(sec) + '</div><button class="btn" id="newex" style="margin-top:16px">New example</button></section></div>';
+      '<section>' + classicHTML(sec) + '<h2>Worked example</h2><p class="lede" style="margin-bottom:12px">Try each one in your head first, then open the explanation.</p><div id="ex">' + learnExample(sec) + '</div><button class="btn" id="newex" style="margin-top:16px">New example</button></section></div>';
     $app.querySelector('[data-go]').addEventListener('click', () => startPractice('section', sec));
     $app.querySelector('#newex').addEventListener('click', () => { document.getElementById('ex').innerHTML = learnExample(sec); });
   }

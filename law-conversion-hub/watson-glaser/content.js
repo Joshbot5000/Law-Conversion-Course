@@ -785,11 +785,11 @@
           why: 'This is the same comparison seen from the other side. If walkers were lower on average, non-walkers were higher on average. It follows.' },
         { a: 'follows', p: 'exists', text: 'At least one office worker in the study took a short walk at lunchtime.',
           why: 'The study compared workers who walked with workers who did not. You cannot compare a group that has nobody in it, so there must have been at least one walker. It follows.' },
-        { a: 'not', p: 'cause', text: 'Taking a short walk at lunchtime reduces office workers\' stress levels.',
+        { a: 'not', p: 'corr', text: 'Taking a short walk at lunchtime reduces office workers\' stress levels.',
           why: 'The study shows a link, not a cause. Maybe less-stressed people simply have more time to walk, or people with lighter workloads both walk and feel less stressed. A link alone does not prove beyond reasonable doubt that one thing causes the other.' },
         { a: 'not', p: 'average', text: 'Every office worker in the study who took a lunchtime walk reported lower stress than every worker who did not.',
           why: 'The passage talks about averages. An average can be lower even if some walkers were more stressed than some non-walkers. "On average" does not mean "every single one".' },
-        { a: 'not', p: 'cause', text: 'If the workers who did not walk at lunchtime started doing so, their stress levels would fall.',
+        { a: 'not', p: 'corr', text: 'If the workers who did not walk at lunchtime started doing so, their stress levels would fall.',
           why: 'This predicts what would happen if people changed their behaviour, which assumes the walks cause lower stress. The study does not show that.' }
       ]
     },
@@ -799,7 +799,7 @@
       statements: [
         { a: 'follows', p: 'flip', text: 'On average, the firms in the research that offered fewer flexible working arrangements had higher staff turnover.',
           why: 'This restates the finding from the other side, so it follows.' },
-        { a: 'not', p: 'cause', text: 'Offering more flexible working causes staff turnover to fall.',
+        { a: 'not', p: 'corr', text: 'Offering more flexible working causes staff turnover to fall.',
           why: 'The research found a link. It could be that firms which already keep staff well can afford to offer flexibility, or some third factor drives both. A link does not prove a cause.' },
         { a: 'not', p: 'average', text: 'Every firm in the research that offered more flexible working had lower turnover than every firm that offered less.',
           why: 'The finding is about averages, and averages allow exceptions.' },
@@ -813,7 +813,7 @@
       statements: [
         { a: 'follows', p: 'flip', text: 'In the study, students who attended 90% or fewer of their lectures achieved lower average marks than those who attended more than 90%.',
           why: 'Same finding, other direction. It follows.' },
-        { a: 'not', p: 'cause', text: 'Attending lectures causes students to get higher marks.',
+        { a: 'not', p: 'corr', text: 'Attending lectures causes students to get higher marks.',
           why: 'Students who are already more motivated might both attend more and study harder. The study shows a link, not a cause.' },
         { a: 'not', p: 'scope', text: 'At every UK university, students who attend more lectures get higher marks.',
           why: 'The study covered one university. Applying it to every university goes beyond the evidence.' },
@@ -827,7 +827,7 @@
       statements: [
         { a: 'follows', p: 'exists', text: 'At least one of the households surveyed had a smart meter.',
           why: 'The survey compared households with and without a smart meter, so both groups must have existed. It follows.' },
-        { a: 'not', p: 'cause', text: 'Installing a smart meter makes a household use less electricity.',
+        { a: 'not', p: 'corr', text: 'Installing a smart meter makes a household use less electricity.',
           why: 'Households that already care about saving energy may be the ones who choose smart meters. The survey shows a link, not a cause.' },
         { a: 'not', p: 'scope', text: 'Across the UK, households with a smart meter use less electricity on average than households without one.',
           why: 'The survey covered {n} households in {city}. Extending it to the whole UK goes beyond the evidence.' },
