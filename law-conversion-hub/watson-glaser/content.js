@@ -756,9 +756,6 @@
       cause: 'a rise in the course fee for full-time study', wider: 'Across all online law courses, the proportion of part-time students changed between {y1} and {y2}.' }
   ];
 
-  const CHANGE_CONTEXTS = [
-    { setup: '{firm}\'s fee income from {area} work {dirVerb} from £{a} million in {y1} to £{b} million in {y2}.', unit: 'money', area: ['employment', 'real estate', 'private client', 'banking', 'litigation'] }
-  ];
 
   const SURVEY_CONTEXTS = [
     { pop: 'trainee solicitors', setup: 'In a survey of {n} trainee solicitors, {k} said they would like more regular feedback from their supervisors.',
@@ -870,6 +867,6 @@
   root.WG_CONTENT = {
     FIRMS, CITIES, NAMES, VILLAGES,
     INFERENCE, REC_TOPICS, ASSUMPTION_ITEMS, ARG_TOPICS, GENERIC_WEAK,
-    CAT_PACKS, PROP_PACKS, TREND_CONTEXTS, CHANGE_CONTEXTS, SURVEY_CONTEXTS, INTERP_QUAL
+    CAT_PACKS, PROP_PACKS, TREND_CONTEXTS, SURVEY_CONTEXTS, INTERP_QUAL
   };
 })(typeof window !== 'undefined' ? window : globalThis);

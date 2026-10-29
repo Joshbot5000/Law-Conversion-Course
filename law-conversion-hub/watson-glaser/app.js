@@ -26,7 +26,7 @@
 
   /* ---------- storage (per-browser; the page works without it) ---------- */
   const KEY = 'wg-trainer-v1';
-  const blank = () => ({ settings: { pace: PER_Q, length: 10 }, sections: {}, patterns: {}, mocks: [], total: 0 });
+  const blank = () => ({ settings: { pace: PER_Q, length: 10 }, sections: {}, patterns: {}, mocks: [], total: 0, seen: {} });
   let S = load();
   function load() {
     try {
@@ -44,6 +44,23 @@
     p.n++; if (correct) p.c++;
     S.total++;
     save();
+  }
+  // A fresh scenario every time: skip every scenario already seen in this
+  // section until the whole bank has been used, then start a new cycle.
+  // accept(set) can reject a set (used when drilling one question type).
+  function nextSet(sec, opts, accept) {
+    const keys = WG.poolKeys(sec);
+    let seen = (S.seen && S.seen[sec]) || [];
+    if (seen.length >= keys.length) seen = [];
+    let set = null;
+    for (let i = 0; i < 40; i++) {
+      set = WG.generateSet(sec, Object.assign({ avoid: new Set(seen) }, opts || {}));
+      if (!accept || accept(set)) break;
+    }
+    S.seen = S.seen || {};
+    S.seen[sec] = seen.concat([set.key]);
+    save();
+    return set;
   }
   const pct = (c, n) => (n ? Math.round(100 * c / n) : 0);
   const secs = ms => Math.round(ms / 1000);
@@ -134,7 +151,7 @@
     $app.innerHTML =
       '<div class="hero"><div><div class="eyebrow">Practice for the Watson-Glaser critical thinking test</div>' +
       '<h1>Train each section until the right answer feels obvious.</h1>' +
-      '<p class="lede">Questions are generated fresh every time, so you can keep going for as long as you like. Every answer comes with a plain-English explanation, the rule behind it, and why the tempting wrong answer is wrong.</p></div>' +
+      '<p class="lede">The bank holds ' + WG.SECTIONS.reduce((a, s) => a + WG.poolKeys(s).length, 0) + ' different scenarios, each with fresh names, numbers and statement mixes every time, and you will not meet the same scenario twice until you have been through them all. Every answer comes with a plain-English explanation, the rule behind it, and why the tempting wrong answer is wrong.</p></div>' +
       '<aside class="facts"><h2>The real test</h2><dl><dt>40</dt><dd>questions across five sections</dd><dt>30 min</dt><dd>typical time limit for law firms</dd><dt>' + PER_Q + ' s</dt><dd>average per question at that pace</dd></dl>' +
       '<div class="mixbar" aria-hidden="true">' + mixBar + '</div><div class="mixkey">' + mixKey + '</div>' +
       '<p>Mix as commonly reported for the 40-question version. Your invitation states your exact time limit, so check it.</p></aside></div>' +
@@ -152,7 +169,7 @@
     $app.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => startPractice(b.dataset.go, b.dataset.arg)));
   }
   function footHTML() {
-    return '<p class="foot">Built as independent practice; not affiliated with Pearson TalentLens or any law firm. Deduction answers are decided by a logic checker that tests every possible situation, and number questions by exact arithmetic. Inference, assumption and argument answers follow the published test rules on hand-checked question patterns. Real-test facts: <a href="https://www.talentlens.com/watson-glaser.html" target="_blank" rel="noopener">TalentLens</a> (publisher), <a href="https://www.allaboutlaw.co.uk/watson-glaser" target="_blank" rel="noopener">AllAboutLaw</a>.</p>';
+    return '<p class="foot">Built as independent practice; not affiliated with Pearson TalentLens or any law firm. Deduction answers are decided by a logic checker that tests every possible situation, and number questions by exact arithmetic. Inference, assumption and argument answers follow the published test rules on hand-checked question patterns. You will not see the same scenario twice until you have worked through the whole bank. Once opened, the app works offline. Real-test facts: <a href="https://www.talentlens.com/watson-glaser.html" target="_blank" rel="noopener">TalentLens</a> (publisher), <a href="https://www.allaboutlaw.co.uk/watson-glaser" target="_blank" rel="noopener">AllAboutLaw</a>.</p>';
   }
 
   /* ======================================================================
@@ -181,12 +198,8 @@
   }
   function refill() {
     const sec = pickSection();
-    let set = null;
     const want = P.mode === 'pattern' ? [P.arg] : P.mode === 'weak' ? weakPatterns() : [];
-    for (let i = 0; i < 40; i++) {
-      set = WG.generateSet(sec, { hard: Math.random() < 0.3 });
-      if (!want.length || set.items.some(x => want.includes(x.pattern))) break;
-    }
+    const set = nextSet(sec, { hard: Math.random() < 0.3 }, want.length ? (st => st.items.some(x => want.includes(x.pattern))) : null);
     P.queue.push(...set.items);
   }
   function nextItem() {
@@ -298,7 +311,7 @@
     WG.SECTIONS.forEach(sec => {
       const got = [];
       let guard = 0;
-      while (got.length < MIX[sec] && guard++ < 50) got.push(...WG.generateSet(sec, { hard: Math.random() < 0.3 }).items);
+      while (got.length < MIX[sec] && guard++ < 50) got.push(...nextSet(sec, { hard: Math.random() < 0.3 }).items);
       items.push(...got.slice(0, MIX[sec]));
     });
     return items;
@@ -531,7 +544,7 @@
       c.items.map((x, i) => '<div class="stmt"><p>' + (i + 1) + '. ' + esc(x[0]) + '</p><details class="reveal"><summary>Show answer</summary><div class="fb"><div class="verdict" style="background:var(--accent-soft);color:var(--accent)">Answer: ' + esc(WG.labelOf(sec, x[1])) + '</div><div class="body"><p>' + esc(x[2]) + '</p></div></div></details></div>').join('') + '</div>';
   }
   function learnExample(sec) {
-    const set = WG.generateSet(sec, {});
+    const set = nextSet(sec, {});
     const it0 = set.items[0];
     return '<div class="example">' + passageHTML(it0) + set.items.map((it, i) =>
       '<div class="stmt"><p>' + (i + 1) + '. ' + esc(it.statement) + '</p><details class="reveal"><summary>Show answer and explanation</summary>' +
@@ -586,8 +599,9 @@
     const rows = WG.SECTIONS.map(s => {
       const st = S.sections[s] || { n: 0, c: 0, ms: 0, timed: 0 };
       const avg = st.timed ? Math.round(st.ms / st.timed / 1000) : null;
+      const bank = WG.poolKeys(s).length, seen = ((S.seen || {})[s] || []).length;
       return '<div class="row"><span>' + esc(META[s].name) + '</span><div class="meter"><i style="width:' + pct(st.c, st.n) + '%"></i></div><span>' + (st.n ? pct(st.c, st.n) + '%' : '–') + '</span></div>' +
-        (st.n ? '<div class="pace" style="margin:-6px 0 4px">' + st.c + ' of ' + st.n + ' correct' + (avg != null ? ' · average ' + avg + 's per question' + (avg > PER_Q ? ' (slower than real pace)' : '') : '') + '</div>' : '');
+        '<div class="pace" style="margin:-6px 0 4px">' + (st.n ? st.c + ' of ' + st.n + ' correct' + (avg != null ? ' · average ' + avg + 's per question' + (avg > PER_Q ? ' (slower than real pace)' : '') : '') + ' · ' : '') + seen + ' of ' + bank + ' scenarios seen this round</div>';
     }).join('');
     const weak = Object.entries(S.patterns).filter(([, v]) => v.n >= 2).sort((a, b) => a[1].c / a[1].n - b[1].c / b[1].n).slice(0, 10);
     const mocks = S.mocks.slice().reverse();
@@ -626,6 +640,11 @@
       else if (e.key === 'ArrowLeft' && M.idx > 0) { M.idx--; renderMockQ(); }
     }
   });
+
+  // Offline support: cache the app so it opens without a connection.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* not available here */ }
+  }
 
   route();
 })();
