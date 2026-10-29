@@ -1,0 +1,15 @@
+{
+  "name": "Watson Glaser Trainer",
+  "short_name": "WG Trainer",
+  "description": "Timed Watson-Glaser practice by section, with plain-English explanations and a 40-question mock test.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf0f4",
+  "theme_color": "#29477a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
