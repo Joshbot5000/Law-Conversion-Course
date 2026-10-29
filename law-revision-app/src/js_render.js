@@ -254,9 +254,11 @@
       note.textContent = 'Your cards, progress and sources sync wherever you open this page in claude.ai. Export a backup now and then for safekeeping.';
     } else {
       if (store.status === 'error') { line.classList.add('bad'); text.textContent = 'Not saved: ' + store.error; }
-      else { line.classList.add('ok'); text.textContent = 'Saved in this browser only'; }
-      note.textContent = (store.localReason ? store.localReason + ' ' : '') +
-        'This copy keeps everything in this browser. Use Export and Import to move data between it and your claude.ai version.';
+      else { line.classList.add('ok'); text.textContent = EDITION === 'friends' ? 'Saved in this browser' : 'Saved in this browser only'; }
+      note.textContent = EDITION === 'friends'
+        ? 'Your library is kept in this browser on this device. Export a backup now and then — it keeps your work safe and moves it to another device (use Import there).'
+        : (store.localReason ? store.localReason + ' ' : '') +
+          'This copy keeps everything in this browser. Use Export and Import to move data between it and your claude.ai version.';
     }
   }
 

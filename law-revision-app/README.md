@@ -19,6 +19,11 @@ mock exams, and study tools (check cards against sources, find duplicates, exam 
 | `tests/fixtures/` | Made-up import files, PDF and Word document, plus `make_fixtures.py` that generates them |
 | `scripts/fetch_libs.sh` | Optional: saves pdf.js and mammoth locally so tests run offline |
 
+## Friends' edition
+A separate link for friends: https://claude.ai/artifact/MQEG6zDGu7GzNpf1HoJUCd. Each friend gets their own copy of a
+starter library, saved in their own browser; Claude features use their own claude.ai account. Built with
+`python3 src/build.py --friends starter.json out.html` from a starter file kept outside this repo.
+
 ## Build
 ```bash
 python3 src/build.py      # writes law_revision_app.html (offline copy) and law-revision-online.html (for claude.ai)

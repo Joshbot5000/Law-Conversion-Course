@@ -1,3 +1,8 @@
+  // Which edition this page is: 'main' (the owner's, saved to claude.ai) or 'friends' (saved in each browser,
+  // starting from STARTER). src/build.py --friends swaps these two lines.
+  var EDITION = 'main';
+  var STARTER = null;
+
   var MODULES = [
     { id: 'contract', label: 'Contract' },
     { id: 'tort',     label: 'Tort' },

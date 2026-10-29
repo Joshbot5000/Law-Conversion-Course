@@ -15,6 +15,17 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - The owner is not a programmer: explain changes in plain English, and send them the rebuilt offline copy
   (`law_revision_app.html`) after each published update.
 
+## Friends' edition
+- A second artifact, https://claude.ai/artifact/MQEG6zDGu7GzNpf1HoJUCd, for the owner's friends. Same code with
+  `EDITION = 'friends'`: each friend's library is saved in their own browser (IndexedDB, `src/js_friends.js`),
+  seeded on first open from a STARTER copy of the owner's library built into the page. It never declares or uses `db`;
+  it declares only `sample` and `downloads`, so Claude features run on each friend's own claude.ai account.
+- Build: `python3 src/build.py --friends /path/outside/repo/starter.json /path/outside/repo/law-revision-friends.html`.
+  starter.json is `{entries, sources:{meta, text}}` read from the owner's artifact database (lib, src, srctext;
+  not progress, prefs or notes). **Never commit starter.json or a friends build** (both are gitignored).
+- Republishing it (same URL) updates the app for everyone but never resets anyone's library: the starter is only used
+  the first time a browser opens it. A new starter only reaches friends who haven't opened it yet.
+
 ## Workflow
 1. Edit the parts in `src/` (match the existing style: plain ES5-style functions, `$()` helper, no frameworks).
 2. `python3 src/build.py` then `python3 tests/wrap.py`.

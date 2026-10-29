@@ -41,6 +41,8 @@
 
   /* ---------- start-up ---------- */
   function initStorage() {
+    // Friends' edition: always this browser (IndexedDB), never the owner's claude.ai storage.
+    if (EDITION === 'friends') { kvOpen().then(function () { startLocal(''); }); return; }
     if (window.claude && typeof window.claude.use === 'function') {
       window.claude.use('db').then(function (db) {
         if (db) startCloud(db); else startLocal('This view can\'t reach your claude.ai storage.');
@@ -55,7 +57,7 @@
     store.mode = 'local';
     store.localReason = reason;
     var raw = null, ok = true;
-    try { raw = window.localStorage.getItem(STORAGE_KEY); } catch (e) { ok = false; }
+    try { raw = kvGet(STORAGE_KEY); } catch (e) { ok = false; }
     store.localOK = ok;
     var data = null;
     if (raw) {
@@ -72,6 +74,8 @@
       }
       if (data.stats && data.stats.days && typeof data.stats.days === 'object') state.stats = { days: data.stats.days };
       if (data.prefs && typeof data.prefs === 'object') state.prefs = sanitizePrefs(data.prefs);
+    } else if (STARTER) {
+      seedFromStarter();
     } else {
       var t = Date.now();
       state.entries = SAMPLE_ENTRIES.map(function (e, i) {
@@ -91,7 +95,7 @@
   function persistLocal() {
     if (!store.localOK && store.localOK !== undefined) return false;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      kvSet(STORAGE_KEY, JSON.stringify({
         version: SCHEMA_VERSION, savedAt: nowISO(),
         entries: state.entries, progress: state.progress, stats: state.stats, prefs: state.prefs
       }));
@@ -106,13 +110,13 @@
   }
   function readLocalSources() {
     try {
-      var d = JSON.parse(window.localStorage.getItem(SOURCES_KEY) || 'null');
+      var d = JSON.parse(kvGet(SOURCES_KEY) || 'null');
       if (d && Array.isArray(d.meta) && d.text && typeof d.text === 'object') return d;
     } catch (e) { /* ignore */ }
     return { meta: [], text: {} };
   }
   function writeLocalSources(d) {
-    window.localStorage.setItem(SOURCES_KEY, JSON.stringify(d));
+    kvSet(SOURCES_KEY, JSON.stringify(d));
   }
 
   /* ---------- claude.ai mode ---------- */

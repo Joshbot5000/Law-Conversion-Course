@@ -55,11 +55,11 @@
   var notePending = {}, noteTimers = {}, noteSeq = {};
   function loadLocalNotes() {
     var list = [];
-    try { list = JSON.parse(window.localStorage.getItem(NOTES_KEY) || '[]'); } catch (e) { list = []; }
+    try { list = JSON.parse(kvGet(NOTES_KEY) || '[]'); } catch (e) { list = []; }
     state.notes = (Array.isArray(list) ? list : []).map(sanitizeNote).filter(Boolean);
   }
   function writeLocalNotes() {
-    try { window.localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes.filter(function (n) { return !n._draft; }).map(noteForStorage))); return true; }
+    try { kvSet(NOTES_KEY, JSON.stringify(state.notes.filter(function (n) { return !n._draft; }).map(noteForStorage))); return true; }
     catch (e) { toast('Browser storage is full, so your note was not saved. Export a backup now.', { type: 'error', timeout: 9000 }); return false; }
   }
   function startNotesCloud(db) {

@@ -3,8 +3,12 @@ law_revision_app.html
 law-revision-online.html
 tests/online_wrapped.html
 # Local copies of pdf.js and mammoth for offline tests (scripts/fetch_libs.sh)
-libs/
+libs
 # Test screenshots and Python caches
 tests/*.png
 __pycache__/
 src/app.js
+# Friends' edition builds contain the owner's library: never commit them
+law-revision-friends.html
+*friends*.html
+starter*.json
