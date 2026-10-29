@@ -1,0 +1,10 @@
+# Built pages (made by src/build.py)
+law_revision_app.html
+law-revision-online.html
+tests/online_wrapped.html
+# Local copies of pdf.js and mammoth for offline tests (scripts/fetch_libs.sh)
+libs/
+# Test screenshots and Python caches
+tests/*.png
+__pycache__/
+src/app.js

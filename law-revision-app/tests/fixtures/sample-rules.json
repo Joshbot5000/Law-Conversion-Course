@@ -1,0 +1,179 @@
+{
+ "app": "Law Revision Repository",
+ "format": "law-revision-backup",
+ "version": 1,
+ "exportedAt": "2026-01-10T09:00:00Z",
+ "count": 10,
+ "entries": [
+  {
+   "id": "rule-1",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 1",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 1 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-2",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 2",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 2 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-3",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 3",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 3 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-4",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 4",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 4 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-5",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 5",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 5 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-6",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 6",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 6 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-7",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 7",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 7 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-8",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 8",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 8 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-9",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 9",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 9 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "rule-10",
+   "module": "tort",
+   "topic": "Imported \u2013 Rules",
+   "type": "principle",
+   "name": "Sample principle 10",
+   "citation": "",
+   "facts": "",
+   "ratio": "Invented principle 10 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+const { chromium } = require('playwright');
+const path = require('path');
+const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+const T = __dirname, LIBS = path.join(T, '..', 'libs');
+(async () => {
+  const b = await chromium.launch(); const ctx = await b.newContext();
+  await ctx.route(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net/, route => { const u = route.request().url(); const f = u.includes('pdf.worker') ? 'pdfjs-dist-3.11.174/build/pdf.worker.min.js' : u.includes('pdf.min') ? 'pdfjs-dist-3.11.174/build/pdf.min.js' : 'mammoth-1.6.0/mammoth.browser.min.js'; if (!require('fs').existsSync(path.join(LIBS, f))) return route.continue(); route.fulfill({ path: path.join(LIBS, f), contentType: 'application/javascript' }); });
+  await ctx.addInitScript({ path: path.join(T, 'mockclaude.js') });
+  const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.goto('file://' + path.join(T, 'online_wrapped.html'));
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); window.name = ''; }); await page.reload(); await page.waitForTimeout(500);
+  await page.click('#addNotesSideBtn');
+  const t0 = Date.now();
+  await page.setInputFiles('#notesFile', path.join(T, 'fixtures', 'sample-notes.docx'));
+  await page.waitForSelector('[data-nt="draft"]', { timeout: 120000 });
+  console.log('docx read in', Date.now() - t0, 'ms:', (await page.textContent('#notesBody')).slice(0, 140).replace(/\s+/g, ' '));
+  const parts = await page.evaluate(() => document.querySelector('#notesBody').textContent.match(/in (\d+) parts/));
+  console.log('parts:', parts && parts[1]);
+  await page.click('[data-nt="save-only"]');
+  await page.waitForFunction(() => document.querySelector('#notesModal').hidden, null, { timeout: 30000 });
+  const n = await page.evaluate(() => Object.keys(window.__mock.store).filter(k => k.startsWith('srctext/')).length);
+  console.log('saved as', n, 'text parts; errors', errs);
+  ok(parts && +parts[1] >= 1, 'Word document read and split into parts');
+  ok(n >= 1, 'source text saved');
+  ok(errs.length === 0, 'no page errors');
+  await b.close();
+})();

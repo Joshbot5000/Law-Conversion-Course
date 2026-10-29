@@ -1,0 +1,349 @@
+{
+ "app": "Law Revision Repository",
+ "format": "law-revision-backup",
+ "version": 1,
+ "exportedAt": "2026-01-10T09:00:00Z",
+ "count": 20,
+ "entries": [
+  {
+   "id": "import-1",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 1 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 1.",
+   "ratio": "Invented rule 1 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-2",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 2 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 2.",
+   "ratio": "Invented rule 2 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-3",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 3 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 3.",
+   "ratio": "Invented rule 3 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-4",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 4 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 4.",
+   "ratio": "Invented rule 4 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-5",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 5 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 5.",
+   "ratio": "Invented rule 5 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-6",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 6 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 6.",
+   "ratio": "Invented rule 6 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-7",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 7 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 7.",
+   "ratio": "Invented rule 7 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-8",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 8 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 8.",
+   "ratio": "Invented rule 8 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-9",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 9 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 9.",
+   "ratio": "Invented rule 9 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-10",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 10 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 10.",
+   "ratio": "Invented rule 10 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-11",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 11 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 11.",
+   "ratio": "Invented rule 11 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-12",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 12 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 12.",
+   "ratio": "Invented rule 12 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-13",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 13 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 13.",
+   "ratio": "Invented rule 13 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-14",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 14 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 14.",
+   "ratio": "Invented rule 14 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-15",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 15 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 15.",
+   "ratio": "Invented rule 15 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-16",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 16 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 16.",
+   "ratio": "Invented rule 16 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-17",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 17 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 17.",
+   "ratio": "Invented rule 17 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-18",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 18 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 18.",
+   "ratio": "Invented rule 18 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-19",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 19 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 19.",
+   "ratio": "Invented rule 19 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  },
+  {
+   "id": "import-20",
+   "module": "contract",
+   "topic": "Imported \u2013 Sample",
+   "type": "case",
+   "name": "Imported Claimant 20 v Defendant",
+   "citation": "",
+   "facts": "Invented facts 20.",
+   "ratio": "Invented rule 20 for import testing.",
+   "strategy": "",
+   "tags": [
+    "sample"
+   ],
+   "memorised": false,
+   "createdAt": "2026-01-10T09:00:00Z",
+   "updatedAt": "2026-01-10T09:00:00Z"
+  }
+ ]
+}

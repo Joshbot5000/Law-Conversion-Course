@@ -1,0 +1,575 @@
+<!-- ================================================================
+     APP SHELL
+     ================================================================ -->
+<div class="app">
+
+  <!-- ---------- LEFT SIDEBAR ---------- -->
+  <aside class="sidebar" id="sidebar" aria-label="Navigation">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">§</div>
+      <div>
+        <h1>Law Revision</h1>
+        <p>Repository &amp; Active Recall</p>
+      </div>
+    </div>
+
+    <nav>
+      <div class="side-heading">Modules</div>
+      <div class="nav" id="moduleNav"></div>
+    </nav>
+
+    <nav>
+      <div class="side-heading">Show</div>
+      <div class="nav" id="typeNav"></div>
+    </nav>
+
+    <section>
+      <div class="side-heading">Your materials</div>
+      <div class="side-actions">
+        <button class="btn" id="sourcesBtn" type="button">📚 Sources <span class="chip" id="sourceCount">0</span></button>
+        <button class="btn btn-ask" id="addNotesSideBtn" type="button">＋ Add notes or a chapter</button>
+      </div>
+    </section>
+
+    <section>
+      <div class="side-heading">Study tools</div>
+      <div class="side-actions">
+        <button class="btn" id="verifyBtn" type="button">✓ Check cards against sources</button>
+        <button class="btn" id="planBtn" type="button">📅 Exam dates &amp; study plan</button>
+        <button class="btn" id="dupBtn" type="button">⧉ Find duplicates</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="analyticsHeading">
+      <div class="side-heading" id="analyticsHeading">Progress</div>
+      <div class="panel">
+        <div class="stat-row">
+          <div class="stat"><b id="statTotal">0</b><span>Authorities</span></div>
+          <div class="stat"><b id="statStrong">0</b><span title="Cards you remember 3+ weeks apart">Strong recall</span></div>
+        </div>
+        <div class="stat-row three">
+          <div class="stat"><b id="statCases">0</b><span>Cases</span></div>
+          <div class="stat"><b id="statStatutes">0</b><span>Statutes</span></div>
+          <div class="stat"><b id="statPrinciples">0</b><span>Principles</span></div>
+        </div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>Reviewed</span><span><i style="background:var(--good)"></i>Verified</span></div>
+        <div class="mod-progress" id="moduleProgress"></div>
+      </div>
+    </section>
+
+    <section class="panel data-panel" aria-labelledby="dataHeading">
+      <h3 id="dataHeading">Your data</h3>
+      <div class="sync-line" id="syncLine"><span class="sync-dot"></span><span id="syncText">Loading…</span></div>
+      <p id="dataNote"></p>
+      <div class="backup-buttons">
+        <button class="btn btn-primary btn-sm" id="exportBtn" type="button">⬇ Export</button>
+        <button class="btn btn-sm" id="importBtn" type="button">⬆ Import</button>
+      </div>
+      <div class="last-backup" id="lastBackup"></div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </section>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ---------- MAIN COLUMN ---------- -->
+  <main class="main">
+    <header class="topbar">
+      <button class="btn menu-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
+      <div class="search-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label for="searchInput" class="sr-only">Search authorities</label>
+        <input id="searchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search names, facts, ratios, tags… (try #omission)">
+        <span class="search-kbd" id="searchKbd">Press /</span>
+        <button id="clearSearch" type="button" hidden>Clear</button>
+      </div>
+      <div class="controls">
+        <button class="btn btn-review" id="reviewBtn" type="button" title="Start today's review (R)">▶ <span class="btn-label">Review</span> <span class="pill" id="reviewPill">0</span></button>
+        <button class="btn btn-notes" id="notesBtn" type="button" title="Lecture notes (N)">📝 <span class="btn-label">Notes</span></button>
+        <button class="btn btn-ask" id="askBtn" type="button" title="Ask about anything you don't understand">? <span class="btn-label">Ask</span></button>
+        <button class="btn" id="quizBtn" type="button" title="Single best answer questions from your cards">☑ <span class="btn-label">Quiz</span></button>
+        <button class="btn btn-exam" id="mockBtn" type="button">✎ <span class="btn-label">Mock exam</span></button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="banner" id="storageBanner" hidden></div>
+      <div class="banner cram-banner" id="cramBanner" hidden>
+        <b>Cram Mode is on.</b> Facts, ratios and exam strategies are hidden. Recall them from memory, then click a card to check yourself.
+      </div>
+
+      <div class="today" id="today" aria-label="Today"></div>
+
+      <div class="content-head">
+        <div>
+          <h2 id="viewTitle">All Authorities</h2>
+          <p id="viewSubtitle"></p>
+        </div>
+        <div class="view-tools">
+          <label class="inline" for="statusSelect">Show
+            <select id="statusSelect">
+              <option value="all">All cards</option>
+              <option value="due">Due for review</option>
+              <option value="new">New (never reviewed)</option>
+              <option value="learning">Learning</option>
+              <option value="strong">Strong (21+ days)</option>
+              <option value="weak">Weak (forgotten 2+ times)</option>
+              <option value="unverified">Not yet verified</option>
+              <option value="verified">Verified</option>
+              <option value="memorised">Memorised</option>
+              <option value="key">★ Key authorities</option>
+            </select>
+          </label>
+          <label class="inline" for="sortSelect">Sort
+            <select id="sortSelect">
+              <option value="module">Module, then topic</option>
+              <option value="recent">Recently added</option>
+              <option value="updated">Recently edited</option>
+              <option value="az">Name A–Z</option>
+              <option value="due">Most overdue first</option>
+              <option value="weak">Weakest first</option>
+            </select>
+          </label>
+          <div class="segmented" role="group" aria-label="Layout">
+            <button type="button" data-view="card" id="viewCardBtn">▦ Cards</button>
+            <button type="button" data-view="list" id="viewListBtn">☰ List</button>
+          </div>
+          <label class="switch cram-wrap" title="Hide ratios, facts and strategy so you can test yourself">
+            <input type="checkbox" id="cramToggle">
+            <span class="track"></span>
+            <span>Cram</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="entries" aria-live="polite"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Floating add button + its menu -->
+<div class="fab-wrap">
+  <div class="fab-menu" id="fabMenu" hidden role="menu">
+    <button type="button" role="menuitem" id="fabQuickNote"><b>Quick lecture note</b><span>Jot something down now – it's filed under the right topic automatically (shortcut: N)</span></button>
+    <button type="button" role="menuitem" id="fabAddCard"><b>Add a card</b><span>Type in a case, statute or principle yourself</span></button>
+    <button type="button" role="menuitem" id="fabAddNotes"><b>Add notes or a chapter</b><span>Upload a PDF, Word file or text and approve the cards drafted from it</span></button>
+  </div>
+  <button class="fab" id="fab" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="fabMenu">
+    <span class="plus">＋</span><span class="fab-label">Add</span>
+  </button>
+</div>
+
+<!-- ================================================================
+     MODAL: ADD / EDIT AUTHORITY
+     ================================================================ -->
+<div class="modal top" id="entryModal" hidden role="dialog" aria-modal="true" aria-labelledby="entryModalTitle">
+  <form class="modal-box" id="entryForm" novalidate>
+    <div class="modal-head">
+      <h2 id="entryModalTitle">Add a card</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="lbl" for="fModule">Module</label>
+          <select id="fModule" required></select>
+        </div>
+        <div class="form-field">
+          <label class="lbl" for="fTopic">Topic / Sub-topic</label>
+          <input class="input" id="fTopic" list="topicList" maxlength="200" placeholder="e.g. Formation – Offer">
+          <datalist id="topicList"></datalist>
+        </div>
+        <div class="form-field full">
+          <span class="lbl">Type</span>
+          <div class="segmented type-toggle" role="radiogroup" aria-label="Authority type">
+            <input type="radio" name="fType" id="fTypeCase" value="case" checked>
+            <label for="fTypeCase" class="t-case">⚖ Case</label>
+            <input type="radio" name="fType" id="fTypeStatute" value="statute">
+            <label for="fTypeStatute" class="t-statute">§ Statute</label>
+            <input type="radio" name="fType" id="fTypePrinciple" value="principle">
+            <label for="fTypePrinciple" class="t-principle">◆ Principle</label>
+          </div>
+        </div>
+        <div class="form-field" id="nameField">
+          <label class="lbl" for="fName">Name <span class="hint">(required)</span></label>
+          <input class="input" id="fName" maxlength="300" placeholder="e.g. Donoghue v Stevenson">
+          <div class="field-error">Please enter a name.</div>
+        </div>
+        <div class="form-field">
+          <label class="lbl" for="fCitation"><span id="lblCitation">Citation</span> <span class="hint">(optional)</span></label>
+          <input class="input" id="fCitation" maxlength="300" placeholder="e.g. [1932] AC 562 (HL)">
+        </div>
+        <div class="form-field full rt-bar-field">
+          <div class="rt-bar" id="rtBar" role="toolbar" aria-label="Formatting for the card text"></div>
+          <div class="rt-hint">Select text, then format it — works in the three boxes below.</div>
+        </div>
+        <div class="form-field full">
+          <label class="lbl" data-focus="fFacts"><span id="lblFacts">Material Facts</span> <span class="hint" id="hintFacts">— what happened?</span></label>
+          <div class="rt-editor" id="fFacts" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="lblFacts" spellcheck="true"></div>
+        </div>
+        <div class="form-field full">
+          <label class="lbl" data-focus="fRatio"><span id="lblRatio">Legal Ratio / Principle</span> <span class="hint">— the core rule, test or interpretation</span></label>
+          <div class="rt-editor" id="fRatio" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="lblRatio" spellcheck="true"></div>
+        </div>
+        <div class="form-field full">
+          <label class="lbl" data-focus="fStrategy"><span id="lblStrategy">Exam Application Strategy</span> <span class="hint">— how to use it in a problem question or essay</span></label>
+          <div class="rt-editor" id="fStrategy" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="lblStrategy" spellcheck="true"></div>
+        </div>
+        <div class="form-field full">
+          <label class="lbl" for="fTags">Tags <span class="hint">— separate with spaces or commas, e.g. #omission #remoteness</span></label>
+          <input class="input" id="fTags" maxlength="1000" placeholder="#omission #remoteness">
+        </div>
+        <div class="form-section">Where this comes from</div>
+        <div class="form-field">
+          <label class="lbl" for="fSource">Source</label>
+          <select id="fSource"></select>
+        </div>
+        <div class="form-field">
+          <label class="lbl" for="fSourceRef">Page / reference <span class="hint">(optional)</span></label>
+          <input class="input" id="fSourceRef" maxlength="120" placeholder="e.g. p. 45 or para 3.2">
+        </div>
+        <div class="form-field full">
+          <label class="lbl" for="fSourceQuote">Supporting quote <span class="hint">— copy the sentence from your source that this card relies on</span></label>
+          <textarea id="fSourceQuote" rows="2" maxlength="1000"></textarea>
+        </div>
+        <div class="form-field full" style="display:flex;gap:22px;flex-wrap:wrap">
+          <label class="check-line"><input type="checkbox" id="fVerified"> I've checked this card against my source</label>
+          <label class="check-line"><input type="checkbox" id="fMemorised"> I've memorised it</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn-primary" id="saveEntryBtn">Save card</button>
+    </div>
+  </form>
+</div>
+
+<!-- ================================================================
+     MODAL: REVIEW SESSION (spaced repetition)
+     ================================================================ -->
+<div class="modal" id="reviewModal" hidden role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+  <div class="modal-box review-box">
+    <div class="modal-head">
+      <h2 id="reviewTitle">Review</h2>
+      <div class="review-scope">
+        <label class="sr-only" for="rvModule">Module</label>
+        <select id="rvModule"></select>
+        <label class="sr-only" for="rvType">Type</label>
+        <select id="rvType">
+          <option value="all">All types</option>
+          <option value="case">Cases</option>
+          <option value="statute">Statutes</option>
+          <option value="principle">Principles</option>
+          <option value="key">★ Key authorities</option>
+        </select>
+        <label class="sr-only" for="rvDirection">Card front</label>
+        <select id="rvDirection" title="What the front of each card shows">
+          <option value="name">Front: name → recall the law</option>
+          <option value="rule">Front: rule → name the authority</option>
+          <option value="mixed">Front: mixed</option>
+        </select>
+      </div>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="reviewBody"></div>
+    <div class="modal-foot">
+      <span class="kbd-hint spacer"><kbd>Space</kbd> show answer · <kbd>1</kbd>–<kbd>4</kbd> rate · <kbd>A</kbd> ask · <kbd>E</kbd> edit</span>
+      <label class="inline foot-note" for="rvNewPerDay">New cards a day
+        <select id="rvNewPerDay"><option>0</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: CHECK CARDS AGAINST THEIR SOURCES
+     ================================================================ -->
+<div class="modal" id="verifyModal" hidden role="dialog" aria-modal="true" aria-labelledby="verifyTitle">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2 id="verifyTitle">Check cards</h2>
+      <div class="review-scope">
+        <label class="sr-only" for="vqModule">Module</label>
+        <select id="vqModule"></select>
+      </div>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="vq-progress"><div class="bar"><i id="vqBar" class="v"></i></div><span id="vqProgress"></span></div>
+    <div class="modal-body" id="verifyBody"></div>
+    <div class="modal-foot" id="verifyFoot">
+      <span class="kbd-hint spacer"><kbd>V</kbd> verify · <kbd>E</kbd> edit · <kbd>S</kbd> skip · <kbd>←</kbd> back · <kbd>O</kbd> open source</span>
+      <button type="button" class="btn" data-vq="back">← Back</button>
+      <button type="button" class="btn" data-vq="skip">Skip</button>
+      <button type="button" class="btn" data-vq="edit">Edit</button>
+      <button type="button" class="btn btn-primary" data-vq="ok">✓ Correct – verify</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: EXAM DATES & STUDY PLAN
+     ================================================================ -->
+<div class="modal" id="planModal" hidden role="dialog" aria-modal="true" aria-labelledby="planTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="planTitle">Exam dates &amp; study plan</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="planBody"></div>
+    <div class="modal-foot"><button type="button" class="btn btn-primary" data-close>Done</button></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: FIND DUPLICATES
+     ================================================================ -->
+<div class="modal" id="dupModal" hidden role="dialog" aria-modal="true" aria-labelledby="dupTitle">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2 id="dupTitle">Find duplicates</h2>
+      <span class="foot-note" id="dupCount"></span>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="dupBody"></div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: LECTURE NOTES
+     ================================================================ -->
+<div class="modal" id="lnModal" hidden role="dialog" aria-modal="true" aria-labelledby="lnTitleH">
+  <div class="modal-box xwide ln-box">
+    <div class="modal-head">
+      <button type="button" class="btn btn-sm ln-list-btn" id="lnListBtn" aria-label="Show all notes">☰ Notes</button>
+      <h2 id="lnTitleH">Lecture notes</h2>
+      <button type="button" class="btn btn-sm btn-primary" id="lnNewBtn">＋ New note</button>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="ln-grid">
+      <aside class="ln-side">
+        <label class="sr-only" for="lnSearch">Search notes</label>
+        <input class="input" id="lnSearch" type="search" placeholder="Search notes…">
+        <label class="sr-only" for="lnModuleFilter">Module</label>
+        <select id="lnModuleFilter"></select>
+        <div class="ln-list" id="lnList"></div>
+      </aside>
+      <section class="ln-editor" id="lnEditor"></section>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: ADD A COMMENT TO A CARD
+     ================================================================ -->
+<div class="modal top" id="commentModal" hidden role="dialog" aria-modal="true" aria-labelledby="commentTitle">
+  <div class="modal-box narrow">
+    <div class="modal-head">
+      <h2 id="commentTitle">Add a comment</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" style="margin:0 0 8px">On <b id="commentCard"></b></p>
+      <label class="sr-only" for="commentText">Comment</label>
+      <textarea class="input" id="commentText" rows="5" placeholder="Extra detail, a lecturer's point, an exam tip…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <span class="kbd-hint spacer"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> save</span>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="commentSave">Save comment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: SOURCES LIBRARY
+     ================================================================ -->
+<div class="modal" id="sourcesModal" hidden role="dialog" aria-modal="true" aria-labelledby="sourcesTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="sourcesTitle">Your sources</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" style="margin-top:0">The chapters and notes your cards come from. "Ask" in <b>My notes only</b> mode answers from these and your cards.</p>
+      <div class="src-list" id="sourceList"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-close>Close</button>
+      <button type="button" class="btn btn-primary" id="addNotesFromSources">＋ Add notes or a chapter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: SOURCE VIEWER
+     ================================================================ -->
+<div class="modal top" id="viewerModal" hidden role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2 id="viewerTitle">Source</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="viewer-tools">
+        <label class="sr-only" for="viewerSearch">Find in this source</label>
+        <input class="input" id="viewerSearch" type="search" placeholder="Find in this source…">
+        <span class="foot-note" id="viewerCount"></span>
+        <button type="button" class="btn btn-sm" id="viewerPrev">↑</button>
+        <button type="button" class="btn btn-sm" id="viewerNext">↓</button>
+      </div>
+      <div class="viewer-text" id="viewerText" tabindex="0"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: ADD NOTES (upload → cards drafted → you approve)
+     ================================================================ -->
+<div class="modal" id="notesModal" hidden role="dialog" aria-modal="true" aria-labelledby="notesTitle">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2 id="notesTitle">Add notes or a chapter</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="notesBody"></div>
+    <div class="modal-foot" id="notesFoot"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: QUIZ (single best answer)
+     ================================================================ -->
+<div class="modal" id="quizModal" hidden role="dialog" aria-modal="true" aria-labelledby="quizTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="quizTitle">Quiz — single best answer</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="quizBody"></div>
+    <div class="modal-foot" id="quizFoot"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: MOCK EXAM
+     ================================================================ -->
+<div class="modal" id="mockModal" hidden role="dialog" aria-modal="true" aria-labelledby="mockModalTitle">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2 id="mockModalTitle">Mock exam — problem question</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="exam-toolbar">
+        <label for="mockModule" class="sr-only">Module</label>
+        <select id="mockModule"></select>
+        <button type="button" class="btn" id="newScenarioBtn">↻ Another set question</button>
+        <button type="button" class="btn btn-ask" id="aiScenarioBtn">✦ Write one from my notes</button>
+      </div>
+      <div class="scenario-head">
+        <h3 id="scenarioTitle"></h3>
+        <span class="chip" id="scenarioModule"></span>
+        <span class="chip" id="scenarioTopic"></span>
+      </div>
+      <div class="scenario" id="scenarioText"></div>
+      <details class="disclosure" id="libraryDisclosure">
+        <summary>Authorities from your library that may be relevant <span class="chip" id="libraryCount">0</span></summary>
+        <div class="disc-body" id="libraryList"></div>
+      </details>
+      <details class="disclosure">
+        <summary>Issue-spotting checklist (try without it first)</summary>
+        <div class="disc-body"><ul id="issuesList"></ul></div>
+      </details>
+      <div class="answer-label">
+        <b><label for="mockAnswer">Your advice (IRAC: Issue → Rule → Application → Conclusion)</label></b>
+        <span>
+          <button type="button" class="btn btn-sm" id="iracTemplateBtn">Insert IRAC headings</button>
+          <span class="wordcount" id="wordCount">0 words</span>
+        </span>
+      </div>
+      <textarea id="mockAnswer" spellcheck="true" placeholder="ISSUE: What legal question arises?&#10;RULE: Which authorities and tests apply?&#10;APPLICATION: Apply the rule to these facts, arguing both sides.&#10;CONCLUSION: Advise the client clearly."></textarea>
+      <div class="grade-note" id="gradeNote" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <span class="foot-note spacer">Your draft is saved automatically.</span>
+      <button type="button" class="btn" data-close>Close</button>
+      <button type="button" class="btn btn-primary" id="gradeBtn">✓ Grade my answer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: ASK
+     ================================================================ -->
+<div class="modal" id="askModal" hidden role="dialog" aria-modal="true" aria-labelledby="askModalTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="askModalTitle">Ask about a concept</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="ask-context" id="askContext"></div>
+      <div class="ask-mode" role="radiogroup" aria-label="Answer from">
+        <span class="foot-note">Answer from:</span>
+        <label class="check-line"><input type="radio" name="askMode" value="notes" id="askModeNotes" checked> My notes only</label>
+        <label class="check-line"><input type="radio" name="askMode" value="open" id="askModeOpen"> My notes + general knowledge</label>
+      </div>
+      <div class="ask-presets" id="askPresets"></div>
+      <div class="ask-thread" id="askThread" aria-live="polite"></div>
+      <div class="ask-compose">
+        <label for="askInput" class="sr-only">Your question</label>
+        <textarea id="askInput" placeholder="e.g. Why isn't silence acceptance? How is this different from promissory estoppel?"></textarea>
+        <p class="ask-hint" id="askHint"></p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn spacer" id="askClearBtn">Start over</button>
+      <button type="button" class="btn" id="askStopBtn" hidden>■ Stop</button>
+      <button type="button" class="btn btn-primary" id="askSendBtn">Ask</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: SINGLE CARD (opened from citations, quizzes, mock exams)
+     ================================================================ -->
+<div class="modal stacked" id="peekModal" hidden role="dialog" aria-modal="true" aria-label="Card">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Card</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body peek-wrap" id="peekBody"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: CONFIRM DIALOG
+     ================================================================ -->
+<div class="modal front" id="dialogModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle">
+  <div class="modal-box narrow">
+    <div class="modal-head"><h2 id="dialogTitle"></h2></div>
+    <div class="modal-body"><p id="dialogMessage" style="margin:0;white-space:pre-wrap"></p></div>
+    <div class="modal-foot" id="dialogButtons"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: CLIPBOARD FALLBACK
+     ================================================================ -->
+<div class="modal front" id="clipboardModal" hidden role="dialog" aria-modal="true" aria-labelledby="clipboardTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="clipboardTitle">Copy this text</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-top:0">Automatic copying was blocked. The text below is selected: press <b>Ctrl + C</b> (Windows) or <b>⌘ + C</b> (Mac), then paste it into a Claude chat.</p>
+      <textarea id="clipboardText" readonly></textarea>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn btn-primary" data-close>Done</button></div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack" aria-live="assertive"></div>

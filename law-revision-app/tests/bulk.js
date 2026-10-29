@@ -1,0 +1,32 @@
+const { chromium } = require('playwright');
+const path = require('path');
+const { N, SRC } = require('./seedinfo');
+const T = __dirname;
+const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+(async () => {
+  const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1360, height: 900 } });
+  await ctx.addInitScript({ path: path.join(T, 'sample_seed.js') });
+  await ctx.addInitScript({ path: path.join(T, 'mockclaude.js') });
+  const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.goto('file://' + path.join(T, 'online_wrapped.html'));
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('lawRevisionApp.migrated', '1'); }); await page.reload();
+  await page.waitForFunction(n => document.querySelector('#statTotal').textContent === String(n), N);
+  await page.click('#dupBtn'); await page.waitForSelector('.dup-bulk');
+  console.log('  ', await page.textContent('.dup-bulk span'));
+  await page.click('[data-dupall]'); await page.click('#dialogButtons >> text=Merge all'); await page.waitForTimeout(1500);
+  const total = +(await page.textContent('#statTotal'));
+  const left = await page.$$eval('.dup-group h4', h => h.map(x => x.textContent));
+  console.log('   total after:', total, '| groups left:', left.length); left.forEach(x => console.log('     -', x));
+  const st = await page.evaluate(() => { const s = window.__mock.store, all = {}; Object.keys(s).forEach(k => { if (k.startsWith('lib/')) Object.assign(all, s[k].e || {}); }); return Object.keys(all).length; });
+  ok(st === total && total < N, 'cloud matches: ' + st);
+  // spot check: merged Combe keeps source link if either had one
+  const combe = await page.evaluate(() => { const s = window.__mock.store, out = []; Object.keys(s).forEach(k => { if (k.startsWith('lib/')) Object.values(s[k].e || {}).forEach(e => { if (e.name === 'Combe v Combe') out.push(e); }); }); return out; });
+  console.log('   Combe:', combe.length, combe[0] && combe[0].id, combe[0] && combe[0].sourceId, (combe[0].tags || []).length + ' tags');
+  await page.screenshot({ path: path.join(T, 'tool_bulk.png') });
+  await page.click('.toast button:has-text("Undo")'); await page.waitForTimeout(1500);
+  ok(await page.textContent('#statTotal') === String(N), 'bulk undo restores every card');
+  const st2 = await page.evaluate(() => { const s = window.__mock.store, all = {}; Object.keys(s).forEach(k => { if (k.startsWith('lib/')) Object.assign(all, s[k].e || {}); }); return Object.keys(all).length; });
+  ok(st2 === N, 'cloud restored too: ' + st2);
+  ok(errs.length === 0, 'no errors ' + JSON.stringify(errs));
+  await b.close();
+})();
