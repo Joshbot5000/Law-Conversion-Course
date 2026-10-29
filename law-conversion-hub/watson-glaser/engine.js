@@ -15,6 +15,8 @@
 (function (root) {
   'use strict';
   const C = root.WG_CONTENT;
+  const BK = root.WG_BANK || {};
+  const cat = (...lists) => [].concat(...lists.map(l => l || []));
 
   /* ---------- randomness (seedable so the test suite can replay) ---------- */
   function mulberry32(a) {
@@ -35,7 +37,10 @@
     return a;
   }
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-  const fill = (str, v) => str.replace(/\{(\w+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
+  // {name} inserts a slot; {^name} inserts it with a capital first letter. Slot
+  // values may themselves contain slots, so two passes are made.
+  const fill1 = (str, v) => str.replace(/\{(\^?)(\w+)\}/g, (m, up, k) => (k in v ? (up ? cap(String(v[k])) : String(v[k])) : m));
+  const fill = (str, v) => fill1(fill1(str, v), v);
   const helpers = { ri, pick, firm: () => pick(C.FIRMS), city: () => pick(C.CITIES), name: () => pick(C.NAMES) };
   const popcount = n => { let c = 0; while (n) { n &= n - 1; c++; } return c; };
   const joinList = (arr, word) => arr.length <= 1 ? (arr[0] || '') : arr.slice(0, -1).join(', ') + ' ' + word + ' ' + arr[arr.length - 1];
@@ -148,9 +153,11 @@
     return m[pair] || ('You chose "' + labelOf('inference', chosen) + '". The best answer is "' + labelOf('inference', correct) + '". ' + INF_MEANING[correct]);
   }
 
-  function genInference() {
-    const t = pick(C.INFERENCE);
-    const v = t.vars(helpers);
+  function baseVars() { return { firm: helpers.firm(), city: helpers.city(), name: helpers.name() }; }
+  function genInference(t) {
+    const v = t.frame ? Object.assign(baseVars(), t.fill, t.frame.nums(helpers)) : Object.assign(baseVars(), t.vars(helpers));
+    if (t.frame) t = { passage: t.frame.passage, statements: t.frame.statements };
+    Object.keys(v).forEach(k => { if (typeof v[k] === 'number' && v[k] >= 1000 && !/^y\d?$/.test(k)) v[k] = v[k].toLocaleString('en-GB'); });
     // Use every category the passage offers once, then fill up to five.
     const byCat = {};
     t.statements.forEach(s => { (byCat[s.a] = byCat[s.a] || []).push(s); });
@@ -173,9 +180,8 @@
   /* ======================================================================
    * ASSUMPTIONS
    * ==================================================================== */
-  function genAssumptionRec() {
-    const t = pick(C.REC_TOPICS);
-    const v = { firm: helpers.firm() };
+  function genAssumptionRec(t) {
+    const v = baseVars();
     const who = fill(t.who, v);
     const Who = cap(who);
     const forms = [
@@ -218,21 +224,40 @@
       }
     });
   }
-  function genAssumptionFixed() {
-    const t = pick(C.ASSUMPTION_ITEMS);
-    const v = { name: helpers.name(), firm: helpers.firm() };
+  function genAssumptionFixed(t) {
+    const v = baseVars();
     const passage = fill(t.passage, v);
     const chosen = shuffle(t.statements);
     return { section: 'assumptions', passage, items: chosen.map(s => asmItem(passage, { a: s.a, p: s.a === 'made' ? 'asm-made' : 'asm-not', text: fill(s.text, v), why: fill(s.why, v) })) };
   }
-  const genAssumptions = () => (rnd() < 0.55 ? genAssumptionRec() : genAssumptionFixed());
+  function genAssumptionCausal(t) {
+    const st = t.made.map(m => ({ a: 'made', text: m[0], why: m[1] })).concat(t.not.map(m => ({ a: 'not', text: m[0], why: m[1] })));
+    return genAssumptionFixed({ passage: t.passage, statements: st });
+  }
+  function genAssumptionEvidence(t) {
+    const passage = '"{name} will make an excellent ' + t.role + '. After all, {name} ' + t.evidence + '."';
+    return genAssumptionFixed({ passage, statements: [
+      { a: 'made', text: t.link, why: 'The evidence is the speaker\'s only reason. It only supports the claim if it actually says something about being good in the role. Flip it ("this is NOT a sign of being a good ' + t.role + '") and the argument collapses. Assumed.' },
+      { a: 'not', text: t.lack, why: 'The speaker says this evidence is a good sign. That does not mean everyone without it would be bad. This is far stronger than anything the speaker needs. Not assumed.' },
+      { a: 'not', text: '{name} would be better in the role than anyone else who could be chosen.', why: 'The speaker says {name} would be excellent, not the best possible choice. Not assumed.' },
+      { a: 'not', text: t.irrelevant, why: 'Nothing in the reasoning depends on this. Not assumed.' }
+    ] });
+  }
+  function genAssumptionCapacity(t) {
+    const passage = '"We should hold ' + t.event + ' in ' + t.venue + ', because more than ' + t.n + ' people have ' + t.done + '."';
+    return genAssumptionFixed({ passage, statements: [
+      { a: 'made', text: cap(t.venue) + ' can hold more than ' + t.n + ' people.', why: 'The speaker picks this venue because of the numbers. Flip it ("it cannot hold that many") and choosing it for that reason makes no sense. Assumed.' },
+      { a: 'made', text: 'The number of people expected is relevant to choosing where to hold ' + t.event + '.', why: 'The only reason given for the choice is the number of people. If numbers did not matter, the reason would be pointless. Assumed.' },
+      { a: 'not', text: 'Every person who has ' + t.done + ' will actually attend.', why: 'The speaker only needs to expect a large turnout. A few people dropping out would not undermine choosing a bigger venue. Not assumed.' },
+      { a: 'not', text: cap(t.event) + ' will be a success.', why: 'Choosing a venue says nothing about whether the event will go well. Not assumed.' }
+    ] });
+  }
 
   /* ======================================================================
    * ARGUMENTS
    * ==================================================================== */
   const ARG_RULE = 'Treat every argument as true. Then ask two questions: is it important, and is it directly about this question? Strong needs both. If it fails either one, it is weak. Strong arguments can be on the Yes side or the No side.';
-  function genArguments() {
-    const t = pick(C.ARG_TOPICS);
+  function genArguments(t) {
     const pool = [];
     t.strongYes.forEach(x => pool.push({ side: 'Yes', text: x, a: 'strong', p: 'arg-strong',
       why: 'If this is true (and you must assume it is), it is a serious benefit that bears directly on whether the answer should be yes. Important and directly related, so it is strong. It does not matter whether you personally agree, or whether there are good arguments on the other side too.' }));
@@ -244,19 +269,24 @@
       why: 'Even if true, this is a small inconvenience. It would not weigh seriously in deciding the question. Not important, so weak.' }));
     t.irrelevant.forEach(x => pool.push({ side: pick(['Yes', 'No']), text: x, a: 'weak', p: 'arg-irrelevant',
       why: 'This may well be true, but it is not about the question being asked. An argument that does not address the question cannot be strong.' }));
-    C.GENERIC_WEAK.forEach(g => pool.push({ side: g.side, text: g.text, a: 'weak', p: 'arg-' + g.kind,
+    // One generic weak argument at most, so topic-specific ones dominate.
+    [pick(C.GENERIC_WEAK)].forEach(g => pool.push({ side: g.side, text: g.text, a: 'weak', p: 'arg-' + g.kind,
       why: g.kind === 'person' ? 'This attacks the people involved, not the idea. Whether a proposal is good does not depend on who supports or opposes it. Not directly related, so weak.'
         : g.kind === 'tradition' ? '"We have always done it differently" says nothing about whether the change would be good or bad. It gives no reason based on the merits, so it is weak.'
           : 'This just restates the answer without giving a reason. Saying "because it is right" (or "because it is bad") gives you nothing to weigh, so it is weak.' }));
-    // A strong reason given under the wrong answer.
-    const flipSrc = rnd() < 0.5 ? { from: t.strongNo, side: 'Yes' } : { from: t.strongYes, side: 'No' };
-    pool.push({ side: flipSrc.side, text: pick(flipSrc.from), a: 'weak', p: 'arg-mismatch',
-      why: 'The point itself may be important, but it supports the opposite answer. As an argument for "' + flipSrc.side + '" it does not work, so it is weak. Always check that the reason really backs up the Yes or No in front of it.' });
-
     const strong = shuffle(pool.filter(x => x.a === 'strong'));
-    const weak = shuffle(pool.filter(x => x.a === 'weak'));
     const nStrong = ri(1, 2);
-    const chosen = shuffle(strong.slice(0, nStrong).concat(weak.slice(0, 4 - nStrong)));
+    const strongPicked = strong.slice(0, nStrong);
+    // A strong reason given under the wrong answer, but never one already shown
+    // as strong in this set (that would give the answer away).
+    const unused = strong.slice(nStrong);
+    if (unused.length && rnd() < 0.7) {
+      const src = pick(unused), side = src.side === 'Yes' ? 'No' : 'Yes';
+      pool.push({ side, text: src.text, a: 'weak', p: 'arg-mismatch',
+        why: 'The point itself may be important, but it supports the opposite answer. As an argument for "' + side + '" it does not work, so it is weak. Always check that the reason really backs up the Yes or No in front of it.' });
+    }
+    const weak = shuffle(pool.filter(x => x.a === 'weak'));
+    const chosen = shuffle(strongPicked.concat(weak.slice(0, 4 - nStrong)));
     return {
       section: 'arguments', passage: t.q, question: t.q,
       items: chosen.map(x => item('arguments', {
@@ -421,9 +451,9 @@
     'ded-convert': '"No A are B" means exactly the same as "No B are A", and "Some A are B" means exactly the same as "Some B are A". These two flip safely. "All" and "Some ... not" do not.'
   };
 
-  function genCategorical(hard) {
+  function genCategorical(hard, fixedPack) {
     for (let attempt = 0; attempt < 400; attempt++) {
-      const pack = pick(C.CAT_PACKS);
+      const pack = fixedPack && attempt < 300 ? fixedPack : pick(CAT_PACKS);
       const k = hard ? 4 : 3;
       const v = { firm: helpers.firm(), city: helpers.city(), village: pick(C.VILLAGES) };
       const T = shuffle(pack.terms).slice(0, k).map(t => ({ pl: fill(t.pl, v), sg: fill(t.sg, v) }));
@@ -596,9 +626,9 @@
     'prop-other': 'A conclusion follows only if no situation exists where every statement is true and the conclusion is false.'
   };
 
-  function genProp() {
+  function genProp(fixedPack) {
     for (let attempt = 0; attempt < 400; attempt++) {
-      const pack = pick(C.PROP_PACKS);
+      const pack = fixedPack && attempt < 300 ? fixedPack : pick(PROP_PACKS);
       const v = { firm: helpers.firm(), name: helpers.name() };
       // Keep the pack's cause-then-effect order so "if" rules read naturally.
       const idx = shuffle(pack.atoms.map((_, i) => i)).slice(0, 3).sort((x, y) => x - y);
@@ -685,10 +715,6 @@
     }
     throw new Error('could not build if/then deduction');
   }
-  function genDeduction(opts) {
-    const hard = opts && opts.hard;
-    return rnd() < 0.6 ? genCategorical(hard && rnd() < 0.7) : genProp();
-  }
 
   /* ======================================================================
    * INTERPRETATION
@@ -697,9 +723,8 @@
   const pctStr = (num, den) => { const p = (num * 100) / den; return (Number.isInteger(p) ? p : p.toFixed(1)) + '%'; };
   const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 
-  function genTrend() {
+  function genTrend(ctx) {
     for (let attempt = 0; attempt < 500; attempt++) {
-      const ctx = pick(C.TREND_CONTEXTS);
       const y1 = ri(2018, 2024), y2 = y1 + 1;
       const N1 = ri(10, 40) * 20, N2 = ri(10, 40) * 20;
       const p1 = ri(3, 14) * 5, p2 = ri(3, 14) * 5;
@@ -722,14 +747,14 @@
       const sayMore = rnd() < 0.5;
       const numTrue = sayMore === (S2 > S1);
       out.push({ text: 'There were ' + (sayMore ? 'more' : 'fewer') + ' ' + ctx.sub + ' in ' + y2 + ' than in ' + y1 + '.',
-        a: numTrue ? 'follows' : 'not', p: 'int-num',
+        a: numTrue ? 'follows' : 'not', p: 'int-num', meta: { group: 'sub' },
         why: 'Compare the actual numbers: ' + S1 + ' in ' + y1 + ' and ' + S2 + ' in ' + y2 + '. That is ' + (S2 > S1 ? 'more' : 'fewer') + ' in ' + y2 + ', so the conclusion ' + (numTrue ? 'follows.' : 'does not follow.') + (mixed ? ' Careful: the proportion went the other way (' + p1 + '% to ' + p2 + '%). The number and the share are different things.' : '') });
       // The other group.
       const O1 = N1 - S1, O2 = N2 - S2;
       const sayMoreO = rnd() < 0.5;
       const oTrue = sayMoreO === (O2 > O1);
       out.push({ text: 'There were ' + (sayMoreO ? 'more' : 'fewer') + ' ' + ctx.other + ' in ' + y2 + ' than in ' + y1 + '.',
-        a: oTrue ? 'follows' : 'not', p: 'int-num',
+        a: oTrue ? 'follows' : 'not', p: 'int-num', meta: { group: 'other' },
         why: 'The passage does not state this directly, but you can work it out: ' + y1 + ': ' + N1 + ' − ' + S1 + ' = ' + O1 + '. ' + y2 + ': ' + N2 + ' − ' + S2 + ' = ' + O2 + '. That is ' + (O2 > O1 ? 'more' : 'fewer') + ' in ' + y2 + ', so the conclusion ' + (oTrue ? 'follows.' : 'does not follow.') });
       // Percentage claim.
       const yr = rnd() < 0.5 ? 1 : 2;
@@ -760,44 +785,48 @@
     throw new Error('could not build trend interpretation');
   }
   function interpItem(passage, o) {
-    return item('interpretation', { passage, statement: o.text, answer: o.a, pattern: o.p, expl: { plain: o.why, rule: INT_RULE } });
+    return item('interpretation', { passage, statement: o.text, answer: o.a, pattern: o.p, meta: o.meta, expl: { plain: o.why, rule: INT_RULE } });
   }
 
   function fmtM(x) { return Number.isInteger(x) ? String(x) : x.toFixed(1); }
-  function genChange() {
+  const fmtN = x => x.toLocaleString('en-GB');
+  function genChange(ctx) {
     for (let attempt = 0; attempt < 500; attempt++) {
-      const ctx = C.CHANGE_CONTEXTS[0];
       const a = pick([4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 25, 30, 40]);
       const rise = rnd() < 0.7;
       const pct = rise ? pick([10, 20, 25, 30, 40, 50, 60, 75, 80, 100, 120, 150]) : pick([10, 20, 25, 30, 40, 50, 60]);
-      const b10 = a * (rise ? 100 + pct : 100 - pct) / 10; // b in tenths of a million
+      const b10 = a * (rise ? 100 + pct : 100 - pct) / 10; // b in tenths of a unit
       if (!Number.isInteger(b10)) continue;
-      const b = b10 / 10;
-      const d = Math.abs(b - a);
+      const b = b10 / 10, d = Math.abs(b - a);
+      const sc = ctx.money ? 1 : ctx.scale;
+      if (!ctx.money && !Number.isInteger(b * sc)) continue;
+      // Shown figures: £ millions to one decimal, or whole numbers.
+      const show = x => (ctx.money ? '£' + fmtM(x) + 'm' : fmtN(Math.round(x * sc)));
+      const showRaw = x => (ctx.money ? fmtM(x) : fmtN(Math.round(x * sc)));
       const y1 = ri(2018, 2024), y2 = y1 + 1;
-      const v = { firm: helpers.firm(), area: pick(ctx.area), a: fmtM(a), b: fmtM(b), y1, y2, dirVerb: rise ? 'rose' : 'fell' };
+      const v = Object.assign(baseVars(), { area: ctx.areas ? pick(ctx.areas) : '', a: showRaw(a), b: showRaw(b), y1, y2, dirVerb: rise ? 'rose' : 'fell' });
       const passage = fill(ctx.setup, v);
-      const calc = 'Change = £' + fmtM(b) + 'm − £' + fmtM(a) + 'm = ' + (rise ? '' : '−') + '£' + fmtM(d) + 'm. Percentage change is always measured from the starting figure: ' + fmtM(d) + ' ÷ ' + fmtM(a) + ' × 100 = ' + pct + '%.';
+      const subj = fill(ctx.subj, v);
+      const calc = 'Change = ' + show(b) + ' − ' + show(a) + ' = ' + (rise ? '' : '−') + show(d) + '. Percentage change is always measured from the starting figure: ' + showRaw(d) + ' ÷ ' + showRaw(a) + ' × 100 = ' + pct + '%.';
       const out = [];
       const word = rise ? 'rose' : 'fell';
+      const period = ' between ' + y1 + ' and ' + y2 + '.';
       const t = pick([10, 20, 25, 30, 40, 50, 60, 75, 100].filter(x => x !== pct));
-      out.push({ text: v.firm + '\'s fee income from ' + v.area + ' work ' + word + ' by more than ' + t + '% between ' + y1 + ' and ' + y2 + '.', a: pct > t ? 'follows' : 'not', p: 'int-pct',
+      out.push({ text: subj + ' ' + word + ' by more than ' + t + '%' + period, a: pct > t ? 'follows' : 'not', p: 'int-pct',
         why: calc + ' Is ' + pct + '% more than ' + t + '%? ' + (pct > t ? 'Yes, so it follows.' : 'No, so it does not follow.') });
-      out.push({ text: v.firm + '\'s fee income from ' + v.area + ' work ' + word + ' by ' + pct + '% between ' + y1 + ' and ' + y2 + '.', a: 'follows', p: 'int-pct', why: calc + ' So it follows.' });
+      out.push({ text: subj + ' ' + word + ' by ' + pct + '%' + period, a: 'follows', p: 'int-pct', why: calc + ' So it follows.' });
       const wrongPctNum = d * 100 / b;
       if (Number.isInteger(wrongPctNum) && wrongPctNum !== pct && wrongPctNum > 0 && wrongPctNum < 100) {
-        out.push({ text: v.firm + '\'s fee income from ' + v.area + ' work ' + word + ' by ' + wrongPctNum + '% between ' + y1 + ' and ' + y2 + '.', a: 'not', p: 'int-pct',
-          why: calc + ' The ' + wrongPctNum + '% figure comes from dividing by the END figure (' + fmtM(d) + ' ÷ ' + fmtM(b) + '), which is the classic slip. It does not follow.' });
+        out.push({ text: subj + ' ' + word + ' by ' + wrongPctNum + '%' + period, a: 'not', p: 'int-pct',
+          why: calc + ' The ' + wrongPctNum + '% figure comes from dividing by the END figure (' + showRaw(d) + ' ÷ ' + showRaw(b) + '), which is the classic slip. It does not follow.' });
       }
       if (rise) {
-        const doubled = pct >= 100;
-        out.push({ text: v.firm + '\'s fee income from ' + v.area + ' work ' + (pct === 100 ? 'exactly doubled' : 'more than doubled') + ' between ' + y1 + ' and ' + y2 + '.',
-          a: pct === 100 ? 'follows' : (pct > 100 ? 'follows' : 'not'), p: 'int-pct',
-          why: 'Doubling means a 100% rise (the new figure is twice the old one: 2 × £' + fmtM(a) + 'm = £' + fmtM(2 * a) + 'm). The actual figure is £' + fmtM(b) + 'm, a ' + pct + '% rise. ' + (pct === 100 ? 'That is exactly double, so it follows.' : doubled ? 'That is more than double, so it follows.' : 'That is less than double, so it does not follow.') });
+        out.push({ text: subj + ' ' + (pct === 100 ? 'exactly doubled' : 'more than doubled') + period,
+          a: pct >= 100 ? 'follows' : 'not', p: 'int-pct',
+          why: 'Doubling means a 100% rise (the new figure is twice the old one: 2 × ' + show(a) + ' = ' + show(2 * a) + '). The actual figure is ' + show(b) + ', a ' + pct + '% rise. ' + (pct === 100 ? 'That is exactly double, so it follows.' : pct > 100 ? 'That is more than double, so it follows.' : 'That is less than double, so it does not follow.') });
       }
-      out.push({ text: v.firm + ' earned more from ' + v.area + ' work in ' + y2 + ' than from any other type of work.', a: 'not', p: 'int-gap',
-        why: 'The passage only gives figures for ' + v.area + ' work. You cannot compare it with other work types, so this does not follow.' });
-      out.push({ text: 'The ' + (rise ? 'rise' : 'fall') + ' in fee income from ' + v.area + ' work was caused by the firm ' + (rise ? 'winning new clients' : 'losing clients') + '.', a: 'not', p: 'int-cause',
+      out.push({ text: fill(ctx.gap, v), a: 'not', p: 'int-gap', why: fill(ctx.gapWhy, v) + ' It does not follow.' });
+      out.push({ text: 'The ' + (rise ? 'rise' : 'fall') + ' was caused by ' + fill(rise ? ctx.cause.rise : ctx.cause.fall, v) + '.', a: 'not', p: 'int-cause',
         why: 'The passage gives the figures but no reasons. Any cause is a guess, so it does not follow beyond reasonable doubt.' });
       const fol = out.filter(o => o.a === 'follows'), nof = out.filter(o => o.a === 'not');
       if (!fol.length || !nof.length) continue;
@@ -809,13 +838,12 @@
   }
 
   const FRACS = [{ n: 1, d: 4, w: 'a quarter' }, { n: 1, d: 3, w: 'a third' }, { n: 1, d: 2, w: 'half' }, { n: 2, d: 3, w: 'two-thirds' }, { n: 3, d: 4, w: 'three-quarters' }];
-  function genSurvey() {
+  function genSurvey(ctx) {
     for (let attempt = 0; attempt < 500; attempt++) {
-      const ctx = pick(C.SURVEY_CONTEXTS);
       const n = ri(2, 10) * 100, p = ri(20, 90);
       const k = n * p / 100;
       if (2 * k === n) continue;
-      const v = { n, k, city: helpers.city() };
+      const v = Object.assign(baseVars(), { n, k });
       const passage = fill(ctx.setup, v);
       const said = fill(ctx.said, v);
       const out = [];
@@ -841,29 +869,111 @@
     }
     throw new Error('could not build survey interpretation');
   }
-  function genInterpQual() {
-    const t = pick(C.INTERP_QUAL);
-    const v = t.vars(helpers);
-    const passage = fill(t.passage, v);
-    const fol = shuffle(t.statements.filter(s => s.a === 'follows')), nof = shuffle(t.statements.filter(s => s.a === 'not'));
-    const chosen = shuffle([fol[0], nof[0]].concat(shuffle(t.statements.filter(s => s !== fol[0] && s !== nof[0])).slice(0, ri(1, 2))));
-    return { section: 'interpretation', passage, items: chosen.map(s => interpItem(passage, { text: fill(s.text, v), a: s.a, p: 'int-' + s.p, why: fill(s.why, v) })) };
+  function pickQual(passage, statements, v) {
+    const fol = shuffle(statements.filter(x => x.a === 'follows')), nof = shuffle(statements.filter(x => x.a === 'not'));
+    const chosen = shuffle([fol[0], nof[0]].concat(shuffle(statements.filter(x => x !== fol[0] && x !== nof[0])).slice(0, ri(1, 2))));
+    return { section: 'interpretation', passage, items: chosen.map(x => interpItem(passage, { text: fill(x.text, v), a: x.a, p: 'int-' + x.p, why: fill(x.why, v) })) };
   }
-  function genInterpretation() {
-    const r = rnd();
-    if (r < 0.3) return genTrend();
-    if (r < 0.5) return genChange();
-    if (r < 0.7) return genSurvey();
-    return genInterpQual();
+  function genInterpQual(t) {
+    const v = Object.assign(baseVars(), t.vars(helpers));
+    return pickQual(fill(t.passage, v), t.statements, v);
   }
+  function genCorr(x) {
+    const v = Object.assign(baseVars(), x, { n: fmtN(ri(2, 20) * 100) });
+    const passage = fill('A study of {n} {subj} in {city} found that, on average, those ' + x.rel + ' {did} {better} than those ' + x.rel + ' {didnt}.', v);
+    return pickQual(passage, [
+      { a: 'follows', p: 'flip', text: 'On average, the {subj} in the study ' + x.rel + ' {didnt} {worse} than those ' + x.rel + ' {did}.',
+        why: 'This is the same comparison seen from the other side. If one group was better on average, the other was worse on average. It follows.' },
+      { a: 'follows', p: 'exists', text: 'At least one of the {subj} in the study {did}.',
+        why: 'The study compared those ' + x.rel + ' {did} with those ' + x.rel + ' {didnt}. You cannot compare a group with nobody in it, so at least one must have. It follows.' },
+      { a: 'not', p: 'corr', text: '{cause}',
+        why: 'The study shows a link, not a cause. Something else could explain both, or it could work the other way round. A link alone does not prove beyond reasonable doubt that one thing causes the other.' },
+      { a: 'not', p: 'average', text: 'Every {sg} in the study ' + x.rel + ' {did} {better} than every {sg} ' + x.rel + ' {didnt}.',
+        why: 'The finding is about averages. An average can be higher even when some individuals in that group did worse than some in the other. "On average" does not mean "every one".' },
+      { a: 'not', p: 'scope', text: 'On average, {wider} ' + x.rel + ' {did} {better} than those ' + x.rel + ' {didnt}.',
+        why: 'The study only covered {n} {subj} in {city}. Extending it to {wider} goes beyond the evidence, so it does not follow.' }
+    ], v);
+  }
+  function genTrial(x) {
+    const v = Object.assign(baseVars(), { m: ri(3, 9) });
+    const X = {}; Object.keys(x).forEach(k => { X[k] = fill(x[k], v); });
+    Object.assign(v, X);
+    v.whereThe = v.where.replace('one of its districts', 'that district').replace(/\bits\b/, 'the');
+    const passage = fill('During a trial lasting {m} months, {org} {change} {where}. Over the trial period, {outcome} {whereThe} was the same as in the same months of the previous year.', v);
+    return pickQual(passage, [
+      { a: 'follows', p: 'restate', text: 'The trial lasted less than a year.', why: '{m} months is less than twelve months. It follows.' },
+      { a: 'follows', p: 'restate', text: 'During the trial, {outcome} {whereThe} did not rise compared with the same months of the previous year.', why: 'The figure was the same, so it did not rise. It follows.' },
+      { a: 'not', p: 'scope', text: '{changeNoun} would have no effect on {outcome} at any of {orgPoss} {sites}.', why: 'The trial covered one site for {m} months. Claiming what would happen everywhere goes beyond the evidence.' },
+      { a: 'not', p: 'gap', text: '{noticed}', why: 'An unchanged figure does not mean nobody noticed. People can notice a change without it affecting {outcome}. The passage does not say what anyone noticed.' },
+      { a: 'not', p: 'gap', text: '{pref}', why: 'The passage gives no information about anyone\'s preferences.' }
+    ], v);
+  }
+  function genResp(x) {
+    const v = Object.assign(baseVars(), { n: ri(15, 45), k: ri(3, 12) });
+    const X = {}; Object.keys(x).forEach(k => { X[k] = fill(x[k], v); });
+    Object.assign(v, X);
+    const passage = fill('All {n} of the {members} at {org} who responded to a survey said they supported {proposal}. A further {k} {members} did not respond.', v);
+    return pickQual(passage, [
+      { a: 'follows', p: 'restate', text: 'At least one of {orgPoss} {members} said they supported {proposal}.', why: '{n} of them said so, so at least one did. It follows.' },
+      { a: 'follows', p: 'restate', text: '{^orgThe} had more than {n} {members} at the time of the survey.', why: '{n} responded and {k} more did not, so there were at least {n} + {k}. It follows.' },
+      { a: 'not', p: 'gap', text: 'All of {orgPoss} {members} said they supported {proposal}.', why: '{k} {members} did not respond, so you do not know what they think. "All who responded" is not "all".' },
+      { a: 'not', p: 'gap', text: 'The {members} who did not respond opposed {proposal}.', why: 'Not responding tells you nothing about someone\'s view. They might support it, oppose it or have no view.' }
+    ], v);
+  }
+
+  /* ======================================================================
+   * SCENARIO POOLS
+   * Every scenario has a key. The app passes the keys you have seen recently
+   * as `avoid`, and a fresh scenario is picked until the pool runs out.
+   * ==================================================================== */
+  const CAT_PACKS = cat(C.CAT_PACKS, BK.CAT_PACKS);
+  const PROP_PACKS = cat(C.PROP_PACKS, BK.PROP_PACKS);
+  let POOLS = null;
+  function buildPools() {
+    const P = { inference: [], assumptions: [], deduction: [], interpretation: [], arguments: [] };
+    C.INFERENCE.forEach(t => P.inference.push({ key: 'inf:' + t.id, gen: () => genInference(t) }));
+    (BK.INF_FRAMES || []).forEach(f => f.fills.forEach(x => P.inference.push({ key: 'inf:' + f.id + ':' + x.id, gen: () => genInference({ frame: f, fill: x }) })));
+    cat(C.REC_TOPICS, BK.REC_TOPICS).forEach((t, i) => P.assumptions.push({ key: 'asm:rec:' + i, gen: () => genAssumptionRec(t) }));
+    C.ASSUMPTION_ITEMS.forEach(t => P.assumptions.push({ key: 'asm:fix:' + t.id, gen: () => genAssumptionFixed(t) }));
+    (BK.ASM_CAUSAL || []).forEach(t => P.assumptions.push({ key: 'asm:cau:' + t.id, gen: () => genAssumptionCausal(t) }));
+    (BK.ASM_EVIDENCE || []).forEach((t, i) => P.assumptions.push({ key: 'asm:evi:' + i, gen: () => genAssumptionEvidence(t) }));
+    (BK.ASM_CAPACITY || []).forEach((t, i) => P.assumptions.push({ key: 'asm:cap:' + i, gen: () => genAssumptionCapacity(t) }));
+    cat(C.ARG_TOPICS, BK.ARG_TOPICS).forEach((t, i) => P.arguments.push({ key: 'arg:' + i, gen: () => genArguments(t) }));
+    CAT_PACKS.forEach((pk, i) => P.deduction.push({ key: 'ded:cat:' + i, gen: o => genCategorical(o.hard && rnd() < 0.7, pk) }));
+    PROP_PACKS.forEach((pk, i) => P.deduction.push({ key: 'ded:prop:' + i, gen: () => genProp(pk) }));
+    cat(C.TREND_CONTEXTS, BK.TREND_CONTEXTS).forEach((t, i) => P.interpretation.push({ key: 'int:trend:' + i, gen: () => genTrend(t) }));
+    (BK.CHANGE_CONTEXTS || []).forEach((t, i) => P.interpretation.push({ key: 'int:chg:' + i, gen: () => genChange(t) }));
+    cat(C.SURVEY_CONTEXTS, BK.SURVEY_CONTEXTS).forEach((t, i) => P.interpretation.push({ key: 'int:sur:' + i, gen: () => genSurvey(t) }));
+    C.INTERP_QUAL.forEach(t => P.interpretation.push({ key: 'int:qual:' + t.id, gen: () => genInterpQual(t) }));
+    (BK.CORR || []).forEach(t => P.interpretation.push({ key: 'int:corr:' + t.id, gen: () => genCorr(t) }));
+    (BK.TRIAL || []).forEach((t, i) => P.interpretation.push({ key: 'int:trial:' + i, gen: () => genTrial(t) }));
+    (BK.RESPONSE || []).forEach((t, i) => P.interpretation.push({ key: 'int:resp:' + i, gen: () => genResp(t) }));
+    return P;
+  }
+  function pools() { return POOLS || (POOLS = buildPools()); }
 
   /* ---------- public API ---------- */
-  const GEN = { inference: genInference, assumptions: genAssumptions, deduction: genDeduction, interpretation: genInterpretation, arguments: genArguments };
-  function generateSet(section, opts) { return GEN[section](opts || {}); }
+  // opts.avoid: keys to skip (recently seen). opts.key: build one exact scenario.
+  // opts.filter: only use scenarios whose key passes this test (if any do).
+  function generateSet(section, opts) {
+    opts = opts || {};
+    const pool = pools()[section];
+    let choices = pool;
+    if (opts.key) choices = pool.filter(p => p.key === opts.key);
+    else {
+      if (opts.filter) { const f = choices.filter(p => opts.filter(p.key)); if (f.length) choices = f; }
+      if (opts.avoid) { const fresh = choices.filter(p => !opts.avoid.has(p.key)); if (fresh.length) choices = fresh; }
+    }
+    const sc = pick(choices);
+    const set = sc.gen(opts);
+    set.key = sc.key;
+    return set;
+  }
+  const poolKeys = section => pools()[section].map(p => p.key);
 
   root.WG = {
-    OPTIONS, PATTERNS, SECTIONS, labelOf, generateSet, setSeed,
+    OPTIONS, PATTERNS, SECTIONS, labelOf, generateSet, setSeed, poolKeys,
     INF_MEANING,
-    _internal: { catAnalyse, catHolds, catProof, propAnalyse, evalF, genCategorical, genProp, genTrend, genChange, genSurvey, genInterpQual, genAssumptionRec, genAssumptionFixed }
+    _internal: { catAnalyse, catHolds, catProof, propAnalyse, evalF, genCategorical, genProp, genTrend, genChange, genSurvey, genInterpQual, genCorr, genTrial, genResp }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

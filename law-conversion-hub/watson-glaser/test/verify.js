@@ -11,11 +11,15 @@
  */
 'use strict';
 require('../content.js');
+require('../bank-inference.js');
+require('../bank-reasoning.js');
+require('../bank-logic.js');
 require('../engine.js');
 const WG = globalThis.WG;
-const N = Number(process.argv[2] || 400);
+const N = Number(process.argv[2] || 6); // sets generated per scenario
 let failures = 0;
-const fail = (msg, it) => { failures++; if (failures <= 25) console.error('FAIL:', msg, '\n  ', it ? JSON.stringify({ p: it.passage, s: it.statement, a: it.answer }) : ''); };
+const failMsgs = new Map();
+const fail = (msg, it) => { failures++; const k = msg.replace(/: .*/, ''); if (!failMsgs.has(k)) failMsgs.set(k, msg); if (failures <= 0) console.error('FAIL:', msg, '\n  ', it ? JSON.stringify({ p: it.passage, s: it.statement, a: it.answer }) : ''); };
 
 /* ---------- categorical: brute force over worlds of individuals ---------- */
 function catByWorlds(premises, concl, k) {
@@ -72,7 +76,7 @@ function checkTrend(it) {
     return (r[1] === 'higher') === higher ? 'follows' : 'not';
   }
   if ((r = s.match(/^There were (more|fewer) (.*) in (\d{4}) than in (\d{4})\./))) {
-    const otherGroup = /had studied law|not about housing|other matters|full-time/.test(r[2]);
+    const otherGroup = it.meta && it.meta.group === 'other';
     const a = otherGroup ? N1 - S1 : S1, b = otherGroup ? N2 - S2 : S2;
     return (r[1] === 'more') === (b > a) ? 'follows' : 'not';
   }
@@ -84,9 +88,9 @@ function checkTrend(it) {
   return 'skip';
 }
 function checkChange(it) {
-  const m = it.passage.match(/(rose|fell) from £([\d.]+) million in \d{4} to £([\d.]+) million/);
+  const m = it.passage.match(/(rose|fell) from £?([\d.,]+)(?: million)? in \d{4} to £?([\d.,]+)(?: million)? in/);
   if (!m) return null;
-  const a = Number(m[2]), b = Number(m[3]);
+  const a = num(m[2]), b = num(m[3]);
   const pct = Math.round(Math.abs(b - a) / a * 100 * 1000) / 1000;
   const s = it.statement;
   let r;
@@ -116,12 +120,21 @@ const BAD_TEXT = /\{\w+\}|undefined|NaN|null/;
 const counts = {};
 const patternsSeen = {};
 let interpChecked = 0, dedChecked = 0;
+const BAD_STYLE = /  |\s[,;:]|\s\.(?!\.\.)|(?<!\.)\.\.(?!\.)|\ba a\b|\bthe the\b|\b(a|an) (a|an|the)\b/;
+const poolSizes = {};
+let setsChecked = 0;
 for (const section of WG.SECTIONS) {
   counts[section] = {};
-  for (let i = 0; i < N; i++) {
-    WG.setSeed(i * 7919 + section.length);
-    const opts = section === 'deduction' ? { hard: i % 3 === 0 } : {};
+  const keys = WG.poolKeys(section);
+  poolSizes[section] = keys.length;
+  if (new Set(keys).size !== keys.length) fail('duplicate scenario keys in ' + section);
+  const reps = section === 'deduction' ? N * 4 : N;
+  for (const key of keys) for (let i = 0; i < reps; i++) {
+    WG.setSeed(i * 7919 + key.length * 31 + section.length);
+    const opts = { key, hard: i % 3 === 0 };
     const set = WG.generateSet(section, opts);
+    setsChecked++;
+    if (set.key !== key) fail('wrong scenario returned for ' + key);
     const seen = new Set();
     if (set.items.length < 2) fail('set too small', set.items[0]);
     for (const it of set.items) {
@@ -133,7 +146,7 @@ for (const section of WG.SECTIONS) {
       if (!WG.PATTERNS[it.pattern]) fail('unknown pattern ' + it.pattern, it);
       const texts = [typeof it.passage === 'string' ? it.passage : it.passage.intro + ' ' + it.passage.lines.join(' '), it.statement, it.expl.plain, it.expl.rule]
         .concat(it.expl.steps || [], it.expl.checks || []);
-      for (const t of texts) if (typeof t !== 'string' || !t.trim() || BAD_TEXT.test(t)) fail('bad text: ' + t, it);
+      for (const t of texts) if (typeof t !== 'string' || !t.trim() || BAD_TEXT.test(t) || BAD_STYLE.test(t)) fail('bad text [' + set.key + ']: ' + t, it);
       if (it.logic && it.logic.kind === 'cat') {
         const ok = catByWorlds(it.logic.premises, it.logic.concl, it.logic.k);
         if ((ok ? 'follows' : 'not') !== it.answer) fail('categorical answer disagrees with world check', it);
@@ -158,10 +171,20 @@ for (const section of WG.SECTIONS) {
     }
   }
 }
-console.log('Answer spread per section:', JSON.stringify(counts, null, 1));
+// A full round with the "avoid" list must visit every scenario exactly once.
+for (const section of WG.SECTIONS) {
+  const keys = WG.poolKeys(section), seen = [];
+  WG.setSeed(4242);
+  for (let i = 0; i < keys.length; i++) seen.push(WG.generateSet(section, { avoid: new Set(seen) }).key);
+  if (new Set(seen).size !== keys.length) fail('a full round in ' + section + ' repeated a scenario before using them all');
+}
+console.log('Scenarios per section:', JSON.stringify(poolSizes), 'total', Object.values(poolSizes).reduce((a, b) => a + b, 0));
+console.log('Sets generated and checked:', setsChecked);
+console.log('Answer spread per section:', JSON.stringify(counts));
 console.log('Deduction items independently re-checked:', dedChecked);
 console.log('Interpretation items arithmetically re-checked:', interpChecked);
 const unused = Object.keys(WG.PATTERNS).filter(p => !patternsSeen[p]);
 console.log('Patterns never produced:', unused.join(', ') || 'none');
+for (const [k, m] of failMsgs) console.error('FAIL ' + m.slice(0, 260));
 console.log(failures ? failures + ' FAILURES' : 'ALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);
