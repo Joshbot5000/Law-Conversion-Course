@@ -49,13 +49,13 @@
   /* ---------- answer options ---------- */
   const OPTIONS = {
     inference: [
-      { k: 'T', label: 'True' }, { k: 'PT', label: 'Probably true' }, { k: 'ID', label: 'Insufficient data' },
-      { k: 'PF', label: 'Probably false' }, { k: 'F', label: 'False' }
+      { k: 'T', label: 'True' }, { k: 'PT', label: 'Probably True' }, { k: 'ID', label: 'Insufficient Data' },
+      { k: 'PF', label: 'Probably False' }, { k: 'F', label: 'False' }
     ],
-    assumptions: [{ k: 'made', label: 'Assumption made' }, { k: 'not', label: 'Assumption not made' }],
-    deduction: [{ k: 'follows', label: 'Conclusion follows' }, { k: 'not', label: 'Conclusion does not follow' }],
-    interpretation: [{ k: 'follows', label: 'Conclusion follows' }, { k: 'not', label: 'Conclusion does not follow' }],
-    arguments: [{ k: 'strong', label: 'Argument strong' }, { k: 'weak', label: 'Argument weak' }]
+    assumptions: [{ k: 'made', label: 'Assumption Made' }, { k: 'not', label: 'Assumption Not Made' }],
+    deduction: [{ k: 'follows', label: 'Conclusion Follows' }, { k: 'not', label: 'Conclusion Does Not Follow' }],
+    interpretation: [{ k: 'follows', label: 'Conclusion Follows' }, { k: 'not', label: 'Conclusion Does Not Follow' }],
+    arguments: [{ k: 'strong', label: 'Argument Strong' }, { k: 'weak', label: 'Argument Weak' }]
   };
   const labelOf = (section, k) => (OPTIONS[section].find(o => o.k === k) || {}).label;
 
@@ -75,8 +75,12 @@
     'asm-priority': 'Assumptions: "most important issue" traps',
     'asm-tried': 'Assumptions: "tried everything else" traps',
     'asm-made': 'Assumptions: what the reasoning relies on',
+    'asm-possible': 'Assumptions: advice assumes it can be followed',
+    'asm-conditional': 'Assumptions: "if you want..." does not assume you do',
     'asm-not': 'Assumptions: extra details not needed',
     'ded-chain': 'Deduction: following a chain to a sure conclusion',
+    'ded-scope': 'Deduction: reading exactly what a rule covers',
+    'ded-notuntil': 'Deduction: "not until" is not "as soon as"',
     'ded-some-follow': 'Deduction: what "some" does guarantee',
     'ded-convert': 'Deduction: flipping "No" and "Some" statements',
     'ded-conversion': 'Deduction: "All A are B" is one-way',
@@ -948,9 +952,49 @@
     (BK.CORR || []).forEach(t => P.interpretation.push({ key: 'int:corr:' + t.id, gen: () => genCorr(t) }));
     (BK.TRIAL || []).forEach((t, i) => P.interpretation.push({ key: 'int:trial:' + i, gen: () => genTrial(t) }));
     (BK.RESPONSE || []).forEach((t, i) => P.interpretation.push({ key: 'int:resp:' + i, gen: () => genResp(t) }));
+    addTestPools(P);
     return P;
   }
   function pools() { return POOLS || (POOLS = buildPools()); }
+
+  /* ======================================================================
+   * TEST LEVEL: hand-written questions matched to the CMS practice test
+   * ==================================================================== */
+  const TL_RULE = {
+    inference: null,
+    assumptions: 'The flip test: make the statement false. If the speaker\'s reasoning falls apart, it was an assumption. If the reasoning still stands, it was not.',
+    deduction: 'Take every statement as true. A conclusion follows only if it must be true. Check exactly what each rule covers, and read "only if", "not until" and "some" literally.',
+    interpretation: INT_RULE,
+    arguments: ARG_RULE
+  };
+  function genTest(section, t) {
+    let st = t.statements || t.args.map(a => ({ a: a.a, p: a.p, text: a.side + '; ' + a.text, why: a.why }));
+    if (section === 'inference') {
+      // Keep the passage's variety: one of each answer type first, up to six.
+      const byCat = {};
+      st.forEach(x => { (byCat[x.a] = byCat[x.a] || []).push(x); });
+      let chosen = Object.keys(byCat).map(k => pick(byCat[k]));
+      const rest = shuffle(st.filter(x => !chosen.includes(x)));
+      while (chosen.length < 6 && rest.length) chosen.push(rest.pop());
+      st = chosen;
+    }
+    const passage = section === 'arguments' ? t.q : t.passage;
+    const items = shuffle(st).map(x => item(section, {
+      passage, question: section === 'arguments' ? t.q : undefined, statement: x.text, answer: x.a, pattern: x.p, level: 'test', logic: x.logic,
+      expl: section === 'inference'
+        ? { plain: x.why, rule: INF_MEANING[x.a], contrast: c => infContrast(c, x.a) }
+        : { plain: x.why, rule: TL_RULE[section] }
+    }));
+    return { section, passage, question: section === 'arguments' ? t.q : undefined, items, level: 'test' };
+  }
+  function addTestPools(P) {
+    const add = (section, list, tag) => (list || []).forEach(t => P[section].push({ key: 'tl:' + tag + ':' + t.id, gen: () => genTest(section, t) }));
+    add('inference', BK.TEST_INFERENCE, 'inf');
+    add('assumptions', BK.TEST_ASSUMPTIONS, 'asm');
+    add('deduction', BK.TEST_DEDUCTION, 'ded');
+    add('interpretation', BK.TEST_INTERPRETATION, 'int');
+    add('arguments', BK.TEST_ARGUMENTS, 'arg');
+  }
 
   /* ---------- public API ---------- */
   // opts.avoid: keys to skip (recently seen). opts.key: build one exact scenario.
@@ -970,9 +1014,10 @@
     return set;
   }
   const poolKeys = section => pools()[section].map(p => p.key);
+  const isTestKey = k => k.indexOf('tl:') === 0;
 
   root.WG = {
-    OPTIONS, PATTERNS, SECTIONS, labelOf, generateSet, setSeed, poolKeys,
+    OPTIONS, PATTERNS, SECTIONS, labelOf, generateSet, setSeed, poolKeys, isTestKey,
     INF_MEANING,
     _internal: { catAnalyse, catHolds, catProof, propAnalyse, evalF, genCategorical, genProp, genTrend, genChange, genSurvey, genInterpQual, genCorr, genTrial, genResp }
   };

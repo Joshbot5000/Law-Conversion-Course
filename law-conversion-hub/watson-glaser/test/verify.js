@@ -14,6 +14,7 @@ require('../content.js');
 require('../bank-inference.js');
 require('../bank-reasoning.js');
 require('../bank-logic.js');
+require('../bank-test.js');
 require('../engine.js');
 const WG = globalThis.WG;
 const N = Number(process.argv[2] || 6); // sets generated per scenario
@@ -156,7 +157,7 @@ for (const section of WG.SECTIONS) {
         const ok = propByTable(it.logic.prem, it.logic.concl, it.logic.n);
         if ((ok ? 'follows' : 'not') !== it.answer) fail('if/then answer disagrees with truth table', it);
         // A "does not follow" must come with a counter-example; "follows" with steps.
-        if (!it.expl.steps || !it.expl.steps.length) fail('no explanation steps', it);
+        if (it.level !== 'test' && (!it.expl.steps || !it.expl.steps.length)) fail('no explanation steps', it);
         dedChecked++;
       }
       if (section === 'interpretation') {
