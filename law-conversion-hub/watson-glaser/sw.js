@@ -7,7 +7,7 @@
  * the first time they load; offline before that, the page falls back to
  * system fonts. Bump VERSION whenever the app's files change.
  */
-const VERSION = 'wg-trainer-v3';
+const VERSION = 'wg-trainer-v4';
 const CORE = [
   './',
   'index.html',
@@ -15,6 +15,7 @@ const CORE = [
   'bank-inference.js',
   'bank-reasoning.js',
   'bank-logic.js',
+  'bank-test.js',
   'engine.js',
   'app.js',
   'manifest.webmanifest',

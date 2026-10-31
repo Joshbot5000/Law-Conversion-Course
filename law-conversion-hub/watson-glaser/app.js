@@ -10,11 +10,25 @@
   const PER_Q = Math.round(REAL.minutes * 60 / REAL.items); // 45 seconds
   const MIX = { inference: 5, assumptions: 12, deduction: 5, interpretation: 6, arguments: 12 };
   const META = {
-    inference: { red: 'Drawing conclusions', name: 'Inference', blurb: 'Rate how far a statement goes beyond the facts, on a five-point scale from True to False.', prompt: 'Proposed inference', tag: 'Statement of facts', color: '#29477a' },
-    assumptions: { red: 'Recognising assumptions', name: 'Recognising assumptions', blurb: 'Spot what the speaker is taking for granted, and what they are not.', prompt: 'Proposed assumption', tag: 'Statement', color: '#4f7cbd' },
-    deduction: { red: 'Drawing conclusions', name: 'Deduction', blurb: 'Decide whether a conclusion must follow from the statements, even if it sounds odd.', prompt: 'Proposed conclusion', tag: 'Statements', color: '#b23c66' },
-    interpretation: { red: 'Drawing conclusions', name: 'Interpretation', blurb: 'Decide whether a conclusion follows beyond reasonable doubt from the evidence given.', prompt: 'Proposed conclusion', tag: 'Passage', color: '#c27a92' },
-    arguments: { red: 'Evaluating arguments', name: 'Evaluating arguments', blurb: 'Judge each argument strong or weak: is it important and directly about the question?', prompt: 'Argument', tag: 'Question', color: '#8a96a8' }
+    inference: { red: 'Drawing conclusions', name: 'Inference', blurb: 'Rate how far a statement goes beyond the facts, on a five-point scale from True to False.', prompt: 'Proposed Inference:', tag: 'Statement:', color: '#29477a' },
+    assumptions: { red: 'Recognising assumptions', name: 'Recognising assumptions', blurb: 'Spot what the speaker is taking for granted, and what they are not.', prompt: 'Proposed Assumption:', tag: 'Statement:', color: '#4f7cbd' },
+    deduction: { red: 'Drawing conclusions', name: 'Deduction', blurb: 'Decide whether a conclusion must follow from the statements, even if it sounds odd.', prompt: 'Proposed Conclusion:', tag: 'Statement:', color: '#b23c66' },
+    interpretation: { red: 'Drawing conclusions', name: 'Interpretation', blurb: 'Decide whether a conclusion follows beyond reasonable doubt from the evidence given.', prompt: 'Proposed Conclusion:', tag: 'Statement:', color: '#c27a92' },
+    arguments: { red: 'Evaluating arguments', name: 'Evaluating arguments', blurb: 'Judge each argument strong or weak: is it important and directly about the question?', prompt: 'Proposed Argument:', tag: 'Statement:', color: '#8a96a8' }
+  };
+  // Taken from the CMS practice test (Pearson Watson-Glaser via Getfeedback).
+  const CMS_NOTE = {
+    inference: 'In the CMS practice test, an inference passage is a long, factual paragraph (about 100 words, written like a news report), followed by several statements, one per question. Some statements are settled by a single phrase, such as "the first in the French Alps", so read every word.',
+    assumptions: 'In the CMS practice test, one statement is followed by several proposed assumptions, one per question. The statement is hedged ("improve your chances of living a satisfied life") and the proposed assumptions are abstract, with no obvious giveaway words.',
+    deduction: 'In the CMS practice test, deduction passages are everyday reasoning that ends with "Therefore:". The traps turn on scope: a rule about loads over one ton tells you nothing about lighter loads.',
+    interpretation: 'Your CMS screenshots did not reach this section, so these questions follow the standard Watson-Glaser format: a realistic passage, often a study or set of figures, with conclusions judged "beyond a reasonable doubt".',
+    arguments: 'Your CMS screenshots did not reach this section, so these questions follow the standard Watson-Glaser format: a policy question with Yes and No arguments. Sets can contain any mix of strong and weak, including all strong or all weak.'
+  };
+  const MOCK_LAYOUTS = {
+    cms: { name: 'CMS practice layout', per: { inference: 8, assumptions: 8, deduction: 8, interpretation: 8, arguments: 8 }, examples: 2,
+      desc: 'Laid out like the CMS practice test: each section opens with worked examples (marked E1, E2 and so on, not scored), then 8 questions per section.' },
+    reported: { name: 'Commonly reported mix', per: MIX, examples: 0,
+      desc: 'The mix commonly reported for the 40-question test: 5 inference, 12 assumptions, 5 deduction, 6 interpretation and 12 arguments.' }
   };
   const INSTR = {
     inference: 'Treat the passage as true. Rate each statement: True, Probably true, Insufficient data, Probably false or False. You may use common knowledge almost everyone has.',
@@ -26,7 +40,7 @@
 
   /* ---------- storage (per-browser; the page works without it) ---------- */
   const KEY = 'wg-trainer-v1';
-  const blank = () => ({ settings: { pace: PER_Q, length: 10 }, sections: {}, patterns: {}, mocks: [], total: 0, seen: {} });
+  const blank = () => ({ settings: { pace: PER_Q, length: 10, level: 'mixed', mockLayout: 'cms', mockMinutes: 30 }, sections: {}, patterns: {}, mocks: [], total: 0, seen: {} });
   let S = load();
   function load() {
     try {
@@ -48,13 +62,26 @@
   // A fresh scenario every time: skip every scenario already seen in this
   // section until the whole bank has been used, then start a new cycle.
   // accept(set) can reject a set (used when drilling one question type).
+  // level: 'test' (hand-written, CMS-style), 'foundation' (generated) or
+  // 'mixed' (about half and half). 'any' applies no filter.
+  function levelFilter(level, sec, seen) {
+    if (level === 'test') return k => WG.isTestKey(k);
+    if (level === 'foundation') return k => !WG.isTestKey(k);
+    if (level === 'any') return null;
+    const freshTest = WG.poolKeys(sec).some(k => WG.isTestKey(k) && !seen.includes(k));
+    return freshTest && Math.random() < 0.5 ? (k => WG.isTestKey(k)) : (k => !WG.isTestKey(k));
+  }
   function nextSet(sec, opts, accept) {
+    opts = opts || {};
     const keys = WG.poolKeys(sec);
     let seen = (S.seen && S.seen[sec]) || [];
-    if (seen.length >= keys.length) seen = [];
+    const filter = levelFilter(opts.level || S.settings.level || 'mixed', sec, seen);
+    const pass = filter ? keys.filter(filter) : keys;
+    // Every scenario at this level seen: start a new round for this level only.
+    if (pass.every(k => seen.includes(k))) seen = seen.filter(k => !pass.includes(k));
     let set = null;
     for (let i = 0; i < 40; i++) {
-      set = WG.generateSet(sec, Object.assign({ avoid: new Set(seen) }, opts || {}));
+      set = WG.generateSet(sec, Object.assign({ avoid: new Set(seen), filter: filter || undefined }, opts));
       if (!accept || accept(set)) break;
     }
     S.seen = S.seen || {};
@@ -103,7 +130,7 @@
     let body;
     if (it.section === 'arguments') body = '<p class="question">' + esc(it.question) + '</p>';
     else if (typeof p === 'string') body = '<div class="text"><p>' + esc(p) + '</p></div>';
-    else body = '<div class="text"><p>' + esc(p.intro) + '</p></div><ul class="premises">' + p.lines.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>';
+    else body = '<div class="text"><p>' + esc(p.intro) + '</p></div><ul class="premises">' + p.lines.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul><div class="text"><p>Therefore:</p></div>';
     return '<div class="paper"><div class="ptag">' + esc(m.tag) + '</div>' + body + '</div>';
   }
   function explHTML(it, chosen) {
@@ -156,7 +183,8 @@
       '<div class="mixbar" aria-hidden="true">' + mixBar + '</div><div class="mixkey">' + mixKey + '</div>' +
       '<p>Mix as commonly reported for the 40-question version. Your invitation states your exact time limit, so check it.</p></aside></div>' +
       '<div class="settings"><div><span class="lbl">Time per question</span>' + seg('pace', [[PER_Q, PER_Q + 's (real pace)'], [60, '60s'], [30, '30s'], [0, 'Untimed']]) + '</div>' +
-      '<div><span class="lbl">Session length</span>' + seg('length', [[10, '10'], [20, '20'], [40, '40'], [0, 'Endless']]) + '</div></div>' +
+      '<div><span class="lbl">Session length</span>' + seg('length', [[10, '10'], [20, '20'], [40, '40'], [0, 'Endless']]) + '</div>' +
+      '<div><span class="lbl">Question level</span>' + seg('level', [['test', 'Test level (CMS-style)'], ['mixed', 'Mixed'], ['foundation', 'Foundation']]) + '</div></div>' +
       '<div class="eyebrow" style="margin-bottom:10px">Practise one section</div><div class="sections">' + cards + '</div>' +
       '<div class="eyebrow" style="margin-bottom:10px">Or mix it up</div><div class="modes">' +
       '<div class="mode feature"><h3>Full mock test</h3><p>40 questions in the real order and mix, against a 30-minute clock. Answers and explanations at the end.</p><a class="btn primary" href="#mock">Set up mock</a></div>' +
@@ -164,7 +192,7 @@
       '<div class="mode"><h3>Mixed practice</h3><p>All five sections in random order, with feedback after each question.</p><button class="btn" data-go="mix">Start mixed</button></div></div>' +
       footHTML();
     $app.querySelectorAll('[data-set]').forEach(b => b.addEventListener('click', () => {
-      S.settings[b.dataset.set] = Number(b.dataset.v); save(); renderHome();
+      const v = b.dataset.v; S.settings[b.dataset.set] = isNaN(Number(v)) ? v : Number(v); save(); renderHome();
     }));
     $app.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => startPractice(b.dataset.go, b.dataset.arg)));
   }
@@ -199,7 +227,7 @@
   function refill() {
     const sec = pickSection();
     const want = P.mode === 'pattern' ? [P.arg] : P.mode === 'weak' ? weakPatterns() : [];
-    const set = nextSet(sec, { hard: Math.random() < 0.3 }, want.length ? (st => st.items.some(x => want.includes(x.pattern))) : null);
+    const set = nextSet(sec, { hard: Math.random() < 0.3, level: want.length ? 'any' : undefined }, want.length ? (st => st.items.some(x => want.includes(x.pattern))) : null);
     P.queue.push(...set.items);
   }
   function nextItem() {
@@ -219,7 +247,7 @@
       '<div class="timebar" id="timebar"><i id="timefill" style="width:100%"></i></div>' +
       '<div class="qgrid">' + passageHTML(it) +
       '<div class="answer"><div class="ptag">' + esc(m.prompt) + '</div><p class="statement">' + esc(it.statement) + '</p>' +
-      '<div class="opts" id="opts">' + optsHTML(it, {}) + '</div><div id="fb"></div></div></div>';
+      '<div class="opts n' + WG.OPTIONS[it.section].length + '" id="opts">' + optsHTML(it, {}) + '</div><div id="fb"></div></div></div>';
     $app.querySelector('#opts').addEventListener('click', e => { const b = e.target.closest('.opt'); if (b && !b.disabled) answer(b.dataset.k); });
     $app.querySelector('#quit').addEventListener('click', () => { if (P.done) finishPractice(); else location.hash = 'home'; });
   }
@@ -295,30 +323,53 @@
    * MOCK TEST
    * ==================================================================== */
   let M = null;
+  function mockLayout() { return MOCK_LAYOUTS[S.settings.mockLayout] || MOCK_LAYOUTS.cms; }
   function renderMockIntro() {
     view = 'mockintro';
     const last = S.mocks.slice(-1)[0];
-    $app.innerHTML = '<div class="eyebrow">Mock test</div><h1 style="font-family:var(--f-display);font-size:2rem;margin:6px 0 10px">40 questions, 30 minutes.</h1>' +
-      '<p class="lede">The five sections come in the usual order with the commonly reported mix: ' + WG.SECTIONS.map(s => MIX[s] + ' ' + META[s].name.toLowerCase()).join(', ') + '. No feedback until you finish. You can move back and forth and change answers before you submit. The clock keeps running; when it reaches zero, the test submits itself.</p>' +
-      '<div class="rows" style="max-width:560px;margin-top:18px">' + WG.SECTIONS.map(s => '<div class="row"><span>' + esc(META[s].name) + '</span><div class="meter"><i style="width:' + (MIX[s] / 12 * 100) + '%;background:' + META[s].color + '"></i></div><span>' + MIX[s] + ' Q</span></div>').join('') + '</div>' +
+    const L = mockLayout(), mins = S.settings.mockMinutes || 30;
+    const nQ = WG.SECTIONS.reduce((a, s) => a + L.per[s], 0);
+    const seg = (name, vals) => '<span class="seg" role="group">' + vals.map(([v, l]) => '<button data-mset="' + name + '" data-v="' + v + '" aria-pressed="' + (S.settings[name] === v) + '">' + l + '</button>').join('') + '</span>';
+    $app.innerHTML = '<div class="eyebrow">Mock test</div><h1 style="font-family:var(--f-display);font-size:2rem;margin:6px 0 10px">' + nQ + ' questions, ' + mins + ' minutes.</h1>' +
+      '<p class="lede">' + esc(L.desc) + ' Questions are drawn from the Test level bank first. No feedback until you finish. Like the CMS practice test, you can move back and forth with Previous and Next and change answers. When the clock reaches zero, the test submits itself.</p>' +
+      '<div class="settings" style="margin-top:16px"><div><span class="lbl">Layout</span>' + seg('mockLayout', [['cms', 'CMS practice layout'], ['reported', 'Commonly reported mix']]) + '</div>' +
+      '<div><span class="lbl">Time limit</span>' + seg('mockMinutes', [[30, '30 min'], [40, '40 min'], [50, '50 min'], [60, '60 min']]) + '</div></div>' +
+      '<div class="rows" style="max-width:560px;margin-top:6px">' + WG.SECTIONS.map(s => '<div class="row"><span>' + esc(META[s].name) + '</span><div class="meter"><i style="width:' + (L.per[s] / 12 * 100) + '%;background:' + META[s].color + '"></i></div><span>' + L.per[s] + ' Q</span></div>').join('') + '</div>' +
+      '<p class="lede">Check your CMS invitation for your actual time limit; law firms commonly give 30 minutes for 40 questions.</p>' +
       (last ? '<p class="lede">Last mock: ' + last.score + '/' + last.total + ' (' + pct(last.score, last.total) + '%) on ' + new Date(last.date).toLocaleDateString('en-GB') + '.</p>' : '') +
       '<p class="lede">Unanswered questions score nothing, so if you are running out of time, answer every remaining question.</p>' +
       '<div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="go">Start the clock</button><a class="btn" href="#home">Not now</a></div>';
+    $app.querySelectorAll('[data-mset]').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.v; S.settings[b.dataset.mset] = isNaN(Number(v)) ? v : Number(v); save(); renderMockIntro();
+    }));
     $app.querySelector('#go').addEventListener('click', startMock);
   }
   function buildMock() {
-    const items = [];
+    const L = mockLayout(), out = [];
     WG.SECTIONS.forEach(sec => {
+      if (L.examples) {
+        // Worked examples, like E1, E2... in the CMS test. Taken from the foundation bank.
+        const ex = WG.generateSet(sec, { filter: k => !WG.isTestKey(k) }).items.slice(0, L.examples);
+        ex.forEach(it => out.push({ it, ex: true }));
+      }
       const got = [];
       let guard = 0;
-      while (got.length < MIX[sec] && guard++ < 50) got.push(...nextSet(sec, { hard: Math.random() < 0.3 }).items);
-      items.push(...got.slice(0, MIX[sec]));
+      while (got.length < L.per[sec] && guard++ < 50) {
+        const fresh = WG.poolKeys(sec).some(k => WG.isTestKey(k) && !((S.seen || {})[sec] || []).includes(k));
+        got.push(...nextSet(sec, { level: fresh ? 'test' : 'mixed', hard: true }).items);
+      }
+      got.slice(0, L.per[sec]).forEach(it => out.push({ it, ex: false }));
     });
-    return items;
+    // Labels: E1, E2... for examples and Q1, Q2... for scored questions.
+    let e = 0, q = 0;
+    out.forEach(x => { x.label = x.ex ? 'E' + (++e) : 'Q' + (++q); });
+    return out;
   }
   function startMock() {
-    const items = buildMock();
-    M = { items, answers: items.map(() => null), idx: 0, startedAt: Date.now(), end: Date.now() + REAL.minutes * 60000, confirm: false };
+    const entries = buildMock();
+    const minutes = S.settings.mockMinutes || 30;
+    const nQ = entries.filter(x => !x.ex).length;
+    M = { entries, answers: entries.map(() => null), idx: 0, minutes, nQ, perQ: minutes * 60 / nQ, startedAt: Date.now(), end: Date.now() + minutes * 60000, confirm: false };
     renderMockQ();
     stopTimer();
     tick = setInterval(paintMockClock, 250);
@@ -334,40 +385,42 @@
     if (pace) {
       const answered = M.answers.filter(Boolean).length;
       const used = (Date.now() - M.startedAt) / 1000;
-      const ahead = answered * PER_Q - used;
-      pace.textContent = answered + ' of ' + M.items.length + ' answered · ' + (ahead >= 0 ? 'on pace' : Math.round(-ahead) + 's behind pace');
+      const ahead = answered * M.perQ - used;
+      pace.textContent = answered + ' of ' + M.nQ + ' answered · ' + (ahead > -10 ? 'on pace' : Math.round(-ahead) + 's behind pace');
       pace.classList.toggle('behind', ahead < -30);
     }
     if (left <= 0) finishMock();
   }
   function renderMockQ() {
     view = 'mock';
-    const it = M.items[M.idx], m = META[it.section];
-    const first = M.idx === 0 || M.items[M.idx - 1].section !== it.section;
-    const secStart = M.items.findIndex(x => x.section === it.section);
+    const en = M.entries[M.idx], it = en.it, m = META[it.section];
+    const first = M.idx === 0 || M.entries[M.idx - 1].it.section !== it.section;
+    const last = M.idx === M.entries.length - 1;
+    const optBlock = en.ex
+      ? '<div class="opts n' + WG.OPTIONS[it.section].length + '" id="opts">' + optsHTML(it, { reveal: true }) + '</div><div class="fb"><div class="verdict" style="background:var(--accent-soft);color:var(--accent)">Example, not scored. Answer: ' + esc(WG.labelOf(it.section, it.answer)) + '</div><div class="body">' + explHTML(it, null) + '</div></div>'
+      : '<div class="opts n' + WG.OPTIONS[it.section].length + '" id="opts">' + optsHTML(it, { chosen: M.answers[M.idx] }) + '</div>';
     $app.innerHTML =
-      '<div class="qhead"><span class="chip">' + esc(m.name) + '</span><span class="qcount">Question ' + (M.idx + 1) + ' of ' + M.items.length + '</span>' +
+      '<div class="qhead"><span class="chip">' + esc(m.name) + '</span><span class="qcount">' + (en.ex ? 'Example ' + esc(en.label) : 'Question ' + esc(en.label.slice(1)) + ' of ' + M.nQ) + '</span>' +
       '<span class="timer" id="timer"><span class="pace" id="mpace"></span><span class="clock" id="mclock"></span></span></div>' +
-      (first ? '<div class="banner"><b>Section: ' + esc(m.name) + '</b>' + esc(INSTR[it.section]) + '</div>'
-        : '<details class="banner"><summary>' + esc(m.name) + ' instructions (question ' + (M.idx - secStart + 1) + ' of ' + MIX[it.section] + ' in this section)</summary>' + esc(INSTR[it.section]) + '</details>') +
+      (first ? '<div class="banner"><b>Section: ' + esc(m.name) + '</b>' + esc(INSTR[it.section]) + '</div>' : '') +
       '<div class="qgrid">' + passageHTML(it) +
-      '<div class="answer"><div class="ptag">' + esc(m.prompt) + '</div><p class="statement">' + esc(it.statement) + '</p>' +
-      '<div class="opts" id="opts">' + optsHTML(it, { chosen: M.answers[M.idx] }) + '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn" id="prev"' + (M.idx === 0 ? ' disabled' : '') + '>Previous</button>' +
-      (M.idx < M.items.length - 1 ? '<button class="btn primary" id="nextq">Next</button>' : '') +
-      '<button class="btn' + (M.idx === M.items.length - 1 ? ' primary' : '') + '" id="finish" style="margin-left:auto">' + (M.confirm ? 'Tap again to submit' : 'Finish test') + '</button></div>' +
-      '<div class="palette" aria-label="Jump to question">' + M.items.map((x, i) => '<button data-i="' + i + '" class="' + (M.answers[i] ? 'done' : '') + (i === M.idx ? ' cur' : '') + '" title="' + esc(META[x.section].name) + '">' + (i + 1) + '</button>').join('') + '</div>' +
+      '<div class="answer"><div class="ptag"><span class="qtag">' + esc(en.label) + '</span> ' + esc(m.prompt) + '</div><p class="statement">' + esc(it.statement) + '</p>' + optBlock +
+      '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center"><button class="btn" id="prev"' + (M.idx === 0 ? ' disabled' : '') + '>Previous</button>' +
+      (!last ? '<button class="btn primary" id="nextq">Next</button>' : '') +
+      '<button class="btn' + (last ? ' primary' : '') + '" id="finish">' + (M.confirm ? 'Tap again to submit' : 'Finish test') + '</button></div>' +
+      '<div class="palette" aria-label="Jump to question">' + M.entries.map((x, i) => '<button data-i="' + i + '" class="' + (x.ex ? 'ex' : '') + (M.answers[i] ? ' done' : '') + (i === M.idx ? ' cur' : '') + '" title="' + esc(META[x.it.section].name) + '">' + esc(x.label) + '</button>').join('') + '</div>' +
       '</div></div>';
     paintMockClock();
-    $app.querySelector('#opts').addEventListener('click', e => {
+    if (!en.ex) $app.querySelector('#opts').addEventListener('click', e => {
       const b = e.target.closest('.opt'); if (!b) return;
       M.answers[M.idx] = b.dataset.k; M.confirm = false;
-      if (M.idx < M.items.length - 1) { M.idx++; } renderMockQ();
+      if (!last) M.idx++;
+      renderMockQ();
     });
-    const prev = $app.querySelector('#prev'); prev.addEventListener('click', () => { if (M.idx > 0) { M.idx--; M.confirm = false; renderMockQ(); } });
+    $app.querySelector('#prev').addEventListener('click', () => { if (M.idx > 0) { M.idx--; M.confirm = false; renderMockQ(); } });
     const nx = $app.querySelector('#nextq'); if (nx) nx.addEventListener('click', () => { M.idx++; M.confirm = false; renderMockQ(); });
     $app.querySelector('#finish').addEventListener('click', () => {
-      const left = M.answers.filter(a => !a).length;
+      const left = M.entries.filter((x, i) => !x.ex && !M.answers[i]).length;
       if (!M.confirm && left) { M.confirm = true; renderMockQ(); const f = $app.querySelector('#finish'); f.textContent = left + ' unanswered. Tap again to submit'; f.focus(); return; }
       finishMock();
     });
@@ -377,19 +430,20 @@
     stopTimer();
     if (!M || M.finished) return;
     M.finished = true;
-    const used = Math.min(REAL.minutes * 60, Math.round((Date.now() - M.startedAt) / 1000));
-    const res = M.items.map((it, i) => ({ it, chosen: M.answers[i], correct: M.answers[i] === it.answer, late: !M.answers[i] && used >= REAL.minutes * 60 }));
-    res.forEach(x => record(x.it, x.correct, null));
+    const limit = M.minutes * 60;
+    const used = Math.min(limit, Math.round((Date.now() - M.startedAt) / 1000));
+    const res = M.entries.map((x, i) => ({ x, i })).filter(o => !o.x.ex).map(({ x, i }) => ({ it: x.it, chosen: M.answers[i], correct: M.answers[i] === x.it.answer, late: !M.answers[i] && used >= limit }));
+    res.forEach(r => record(r.it, r.correct, null));
     const by = {};
-    WG.SECTIONS.forEach(s => { const xs = res.filter(x => x.it.section === s); by[s] = { n: xs.length, c: xs.filter(x => x.correct).length }; });
-    const score = res.filter(x => x.correct).length;
+    WG.SECTIONS.forEach(s => { const xs = res.filter(r => r.it.section === s); by[s] = { n: xs.length, c: xs.filter(r => r.correct).length }; });
+    const score = res.filter(r => r.correct).length;
     S.mocks.push({ date: Date.now(), score, total: res.length, by, used });
     save();
     view = 'mockresults';
     window.scrollTo(0, 0);
-    $app.innerHTML = '<div class="eyebrow">Mock test result</div><div class="score"><span class="big">' + score + '</span><span class="of">/ ' + res.length + ' · ' + pct(score, res.length) + '%</span><span class="of">time used ' + fmtClock(used) + ' of ' + REAL.minutes + ':00</span></div>' +
+    $app.innerHTML = '<div class="eyebrow">Mock test result</div><div class="score"><span class="big">' + score + '</span><span class="of">/ ' + res.length + ' · ' + pct(score, res.length) + '%</span><span class="of">time used ' + fmtClock(used) + ' of ' + M.minutes + ':00</span></div>' +
       '<div class="rows">' + WG.SECTIONS.map(s => '<div class="row"><span>' + esc(META[s].name) + '</span><div class="meter"><i style="width:' + pct(by[s].c, by[s].n) + '%"></i></div><span>' + by[s].c + '/' + by[s].n + '</span></div>').join('') + '</div>' +
-      '<p class="lede">This is a raw score. Employers compare candidates’ results against a comparison group, and each firm sets its own bar, so a raw percentage does not map directly onto a pass or fail.</p>' +
+      '<p class="lede">This is a raw score. The real test is scored against a comparison group, and each firm sets its own bar, so a raw percentage does not map directly onto a pass or fail.</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 24px"><button class="btn primary" id="again">Take another mock</button><a class="btn" href="#progress">See progress</a></div>' +
       '<h3 style="margin-bottom:8px">Review every question</h3>' + reviewHTML(res);
     $app.querySelector('#again').addEventListener('click', renderMockIntro);
@@ -544,7 +598,7 @@
       c.items.map((x, i) => '<div class="stmt"><p>' + (i + 1) + '. ' + esc(x[0]) + '</p><details class="reveal"><summary>Show answer</summary><div class="fb"><div class="verdict" style="background:var(--accent-soft);color:var(--accent)">Answer: ' + esc(WG.labelOf(sec, x[1])) + '</div><div class="body"><p>' + esc(x[2]) + '</p></div></div></details></div>').join('') + '</div>';
   }
   function learnExample(sec) {
-    const set = nextSet(sec, {});
+    const set = WG.generateSet(sec, { filter: WG.isTestKey });
     const it0 = set.items[0];
     return '<div class="example">' + passageHTML(it0) + set.items.map((it, i) =>
       '<div class="stmt"><p>' + (i + 1) + '. ' + esc(it.statement) + '</p><details class="reveal"><summary>Show answer and explanation</summary>' +
@@ -581,11 +635,11 @@
       (g.fallacies ? '<h3>The four fallacies to watch for</h3><div class="scale">' + g.fallacies.map(f => '<div><b>' + esc(f[0]) + '</b><span>' + esc(f[1]) + '</span></div>').join('') + '</div>' : '');
     const st = S.sections[sec];
     $app.innerHTML = '<div class="eyebrow">Learn \u00B7 ' + esc(META[sec].red) + '</div><h1 style="font-family:var(--f-display);font-size:2rem;margin-top:6px">' + esc(META[sec].name) + '</h1><div class="tabs">' + tabs + '</div>' +
-      '<div class="guide"><section><h2>How it works</h2><p>' + esc(g.what) + '</p>' + scale +
+      '<div class="guide"><section><h2>How it works</h2><p>' + esc(g.what) + '</p><div class="banner" style="margin:12px 0 0"><b>In the CMS test</b>' + esc(CMS_NOTE[sec]) + '</div>' + scale +
       '<h3>Method</h3><ol>' + g.method.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
       '<h3>Traps</h3><ul>' + g.traps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' + extra + cheat +
       '<div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap"><button class="btn primary" data-go="section" data-arg="' + sec + '">Practise ' + esc(META[sec].name.toLowerCase()) + '</button>' + (st ? '<span class="pace" style="align-self:center">Your accuracy: ' + pct(st.c, st.n) + '% of ' + st.n + '</span>' : '') + '</div></section>' +
-      '<section>' + classicHTML(sec) + '<h2>Worked example</h2><p class="lede" style="margin-bottom:12px">Try each one in your head first, then open the explanation.</p><div id="ex">' + learnExample(sec) + '</div><button class="btn" id="newex" style="margin-top:16px">New example</button></section></div>';
+      '<section>' + classicHTML(sec) + '<h2>Test-level example</h2><p class="lede" style="margin-bottom:12px">Written to match the CMS practice test. Try each one in your head first, then open the explanation.</p><div id="ex">' + learnExample(sec) + '</div><button class="btn" id="newex" style="margin-top:16px">New example</button></section></div>';
     $app.querySelector('[data-go]').addEventListener('click', () => startPractice('section', sec));
     $app.querySelector('#newex').addEventListener('click', () => { document.getElementById('ex').innerHTML = learnExample(sec); });
   }
@@ -631,12 +685,12 @@
       if (!P.answered && n >= 1 && n <= WG.OPTIONS[P.cur.section].length) { e.preventDefault(); answer(WG.OPTIONS[P.cur.section][n - 1].k); }
       else if (P.answered && (e.key === 'Enter' || e.key === 'ArrowRight') && !(e.target.closest && e.target.closest('button, summary, a'))) { e.preventDefault(); nextItem(); }
     } else if (view === 'mock' && M && !M.finished) {
-      const it = M.items[M.idx];
-      if (n >= 1 && n <= WG.OPTIONS[it.section].length) {
+      const en = M.entries[M.idx], it = en.it, lastIdx = M.entries.length - 1;
+      if (!en.ex && n >= 1 && n <= WG.OPTIONS[it.section].length) {
         e.preventDefault(); M.answers[M.idx] = WG.OPTIONS[it.section][n - 1].k; M.confirm = false;
-        if (M.idx < M.items.length - 1) M.idx++;
+        if (M.idx < lastIdx) M.idx++;
         renderMockQ();
-      } else if (e.key === 'ArrowRight' && M.idx < M.items.length - 1) { M.idx++; renderMockQ(); }
+      } else if (e.key === 'ArrowRight' && M.idx < lastIdx) { M.idx++; renderMockQ(); }
       else if (e.key === 'ArrowLeft' && M.idx > 0) { M.idx--; renderMockQ(); }
     }
   });
