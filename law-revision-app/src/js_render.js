@@ -296,6 +296,7 @@
       '<div class="new"><b>' + fresh + '</b><span>new to learn</span></div>' +
       '<div><b>' + row[0] + '</b><span>reviewed today</span></div></div>' +
       '<div class="today-actions">' +
+      '<button type="button" class="btn btn-session" data-today="session" title="Reviews, a short quiz on your weakest topic, practice on mistakes and a quick test">🎯 Today\'s session</button>' +
       (due + fresh > 0
         ? '<button type="button" class="btn btn-review" data-today="start">▶ Start review</button>'
         : '<span style="font-weight:600;color:var(--good)">✓ All caught up</span><button type="button" class="btn btn-sm" data-today="practise">Practise anyway</button>') +
@@ -329,6 +330,7 @@
       '<div class="verify-line"><span>Verified against your sources: <b>' + ver + '</b> of ' + inMod.length + '</span>' +
       (ver < inMod.length ? '<span><button type="button" class="btn btn-sm" data-today="verifyq">✓ Check cards</button> <button type="button" class="linklike" data-today="unverified">Show unchecked</button></span>' : '') + '</div></section>';
     box.innerHTML = main + forecast + weakHtml;
+    maybeWeeklyRoll();
     box._weak = weak;
   }
 

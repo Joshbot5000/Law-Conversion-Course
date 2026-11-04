@@ -40,8 +40,8 @@
   }
   function openFlashForTopic(key) {
     var mod = key.split('|')[0];
-    if (!fl) fl = { module: mod, topics: [], type: null, card: null, revealed: false, recent: [], n: 0, r: 0, missed: [], seenTopics: {} };
-    fl.module = mod; fl.topics = [key]; fl.card = null;
+    if (!fl) fl = newFl();
+    fl.module = mod; fl.topics = [key]; clearFlashCard();
     var best = ['case', 'principle', 'statute'].filter(function (t) { return flashPool(t).length; })[0];
     openFlash(best || null);
   }
@@ -56,7 +56,7 @@
   function renderProgress() {
     var body = $('#progressBody');
     var open = state.mistakes.filter(function (m) { return !m.resolved; }).length;
-    var tabs = [['suggest', 'Suggestions'], ['mistakes', 'Mistakes' + (open ? ' (' + open + ')' : '')], ['topics', 'By topic'], ['activity', 'Activity']];
+    var tabs = [['suggest', 'Suggestions'], ['week', 'This week'], ['mistakes', 'Mistakes' + (open ? ' (' + open + ')' : '')], ['topics', 'By topic'], ['activity', 'Activity']];
     var head = '<div class="pg-top"><div class="seg" role="tablist">' + tabs.map(function (t) {
         return '<button type="button" role="tab" class="seg-btn' + (pg.tab === t[0] ? ' on' : '') + '" aria-selected="' + (pg.tab === t[0]) + '" data-pgtab="' + t[0] + '">' + t[1] + '</button>';
       }).join('') + '</div>' +
@@ -68,6 +68,8 @@
       html = '<p class="muted pg-intro">Worked out from your quiz answers, quick tests, saved mistakes and reviews' + (Object.keys(state.prefs.exams).length ? ', with topics for upcoming exams pushed up' : '') + '.</p>' +
         (list.length ? '<div class="sg-list">' + list.map(function (g, i) { return suggestionHTML(g, i, 'progress'); }).join('') + '</div>'
           : '<div class="empty" style="padding:24px 12px"><h3>Nothing stands out yet</h3><p>Do a few quizzes and quick tests — the topics you find hardest will be suggested here, with a reason for each.</p></div>');
+    } else if (pg.tab === 'week') {
+      html = weekHTML();
     } else if (pg.tab === 'mistakes') {
       html = mistakesHTML();
     } else if (pg.tab === 'topics') {
@@ -161,4 +163,33 @@
       else if (ev.target.id === 'pgSort') { pg.sort = ev.target.value; renderProgress(); }
       else if (ev.target.id === 'pgMTopic') { pg.mTopic = ev.target.value; renderProgress(); }
     });
+  }
+
+  function weekTiles(r) {
+    var tile = function (v, label) { return '<div class="stat"><b>' + v + '</b><span>' + label + '</span></div>'; };
+    return '<div class="pg-stats">' +
+      tile(r.reviews, 'cards reviewed' + (r.reviews ? ' · ' + Math.round((1 - r.again / r.reviews) * 100) + '% recalled' : '')) +
+      tile(r.qn ? r.qr + '/' + r.qn : '—', 'quiz questions right' + (r.qn ? ' (' + Math.round(r.qr / r.qn * 100) + '%)' : '')) +
+      tile(r.fn ? Math.round(r.fr * 10) / 10 + '/' + r.fn : '—', 'quick-test cards known') +
+      tile(r.mastered + ' / ' + r.made, 'mistakes mastered / new') + '</div>';
+  }
+  function weekHTML() {
+    var w = state.perf.w, prev = state.perf.wPrev;
+    var fmt = function (t) { return new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+    var name = function (k) { var p = k.split('|'); return esc(p.slice(1).join('|')) + ' <small>' + esc(MODULE_LABEL[p[0]] || '') + '</small>'; };
+    var html = '';
+    if (prev && w) {
+      var end = keyTime(w.wk), r = weekReport(prev.wk, end), mv = weekMovers(prev, w);
+      var weeks = Math.round((end - keyTime(prev.wk)) / (7 * DAY));
+      html += '<h4 class="pg-h">' + (weeks > 1 ? 'Since ' + fmt(keyTime(prev.wk)) : 'Last week · ' + fmt(keyTime(prev.wk)) + ' – ' + fmt(end - DAY)) + '</h4>' + weekTiles(r) +
+        '<div class="pg-movers"><div><b class="pg-up">▲ Improved</b>' + (mv.improved.length ? '<ul>' + mv.improved.map(function (x) { return '<li>' + name(x.key) + '</li>'; }).join('') + '</ul>' : '<p class="muted">No clear change yet.</p>') + '</div>' +
+        '<div><b class="pg-down">▼ Needs attention</b>' + (mv.slipped.length ? '<ul>' + mv.slipped.map(function (x) { return '<li>' + name(x.key) + '</li>'; }).join('') + '</ul>' : '<p class="muted">Nothing slipped.</p>') + '</div></div>';
+    } else {
+      html += '<p class="muted pg-intro">Your first weekly summary appears next Monday: what you reviewed, how your quizzes went, what you mastered, and which topics improved or slipped.</p>';
+    }
+    var list = suggestions('all', 3);
+    pg.list = list;
+    html += '<h4 class="pg-h">Focus for this week</h4>' + (list.length ? '<div class="sg-list">' + list.map(function (g, i) { return suggestionHTML(g, i, 'progress'); }).join('') + '</div>' : '<p class="muted">Nothing stands out — keep your reviews ticking over.</p>');
+    if (w) html += '<h4 class="pg-h">This week so far</h4>' + weekTiles(weekReport(w.wk));
+    return html;
   }

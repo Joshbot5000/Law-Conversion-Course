@@ -25,6 +25,13 @@
         n: Math.max(0, Math.round(num(s.n, 0))), r: Math.max(0, num(s.r, 0)),
         topics: Array.isArray(s.topics) ? s.topics.filter(function (t) { return typeof t === 'string'; }).slice(0, 12).map(function (t) { return t.slice(0, 220); }) : [] };
     });
+    ['w', 'wPrev'].forEach(function (k) {
+      var x = v[k];
+      if (!x || typeof x !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(x.wk || '')) return;
+      var sc = {};
+      if (x.sc && typeof x.sc === 'object') Object.keys(x.sc).slice(0, 400).forEach(function (t) { if (t.length <= 220) sc[t] = Math.max(0, num(x.sc[t], 0)); });
+      out[k] = { wk: x.wk, sc: sc };
+    });
     return out;
   }
   function sanitizeMistake(m) {
@@ -47,7 +54,9 @@
   function mistakeById(id) { return state.mistakes.filter(function (m) { return m.id === id; })[0]; }
 
   /* ---- loading ---- */
+  var memoryReady = false, weekRolled = false;
   function loadLocalMemory() {
+    memoryReady = true;
     var d = null;
     try { d = JSON.parse(kvGet(MEMORY_KEY) || 'null'); } catch (e) { d = null; }
     state.perf = sanitizePerf(d && d.perf);
@@ -59,6 +68,7 @@
   }
   function startMemoryCloud(db) {
     db.collection('memory').onSnapshot(function (snap) {
+      memoryReady = true;
       snap.docs.forEach(function (d) {
         store.docs['memory/' + d.id] = true;
         if (d.id === 'perf' && !queueBusy('memory/perf') && !perfTimer) state.perf = sanitizePerf(d.data());
@@ -241,4 +251,64 @@
   // The things most worth working on next (only where there's real evidence).
   function suggestions(module, limit) {
     return topicInsights(module).filter(function (g) { return g.score >= 0.9 && g.reasons.length; }).slice(0, limit || 5);
+  }
+
+  /* ---- weekly summary ---- */
+  function mondayKey(t) {
+    var d = new Date(t == null ? Date.now() : t);
+    d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    return dayKey(d.getTime());
+  }
+  function keyTime(k) { return new Date(k + 'T00:00:00').getTime(); }
+  // Once per week (on the first visit), keep a snapshot of how every topic stands, to compare against next week.
+  function maybeWeeklyRoll() {
+    if (weekRolled || !memoryReady || !state.loaded || store.mode === 'pending') return;
+    weekRolled = true;
+    var wk = mondayKey();
+    if (state.perf.w && state.perf.w.wk === wk) return;
+    var sc = {};
+    topicInsights('all').forEach(function (g) { if (g.score > 0) sc[g.key] = g.score; });
+    var prev = state.perf.w || null;
+    state.perf.wPrev = prev;
+    state.perf.w = { wk: wk, sc: sc };
+    persistPerf();
+    if (prev) {
+      var r = weekReport(prev.wk, keyTime(wk));
+      if (r.active) setTimeout(function () {
+        toast('Your weekly summary is ready: ' + r.headline, { timeout: 12000, actionLabel: 'Open', onAction: function () { openProgress('week'); } });
+      }, 1500);
+    }
+  }
+  // What happened between two dates: reviews, quiz and quick-test results, and mistakes made and mastered.
+  function weekReport(fromKey, endMs) {
+    var start = keyTime(fromKey), end = endMs || Date.now();
+    var rep = { from: start, to: end, reviews: 0, again: 0, qn: 0, qr: 0, fn: 0, fr: 0, made: 0, mastered: 0, days: 0 };
+    for (var t = start; t < end; t += DAY) { var d = state.stats.days[dayKey(t)]; if (d && d[0]) { rep.reviews += d[0]; rep.again += d[1] || 0; rep.days++; } }
+    state.perf.s.forEach(function (x) {
+      if (x.at < start || x.at >= end) return;
+      if (x.kind === 'flash') { rep.fn += x.n; rep.fr += x.r; } else { rep.qn += x.n; rep.qr += x.r; }
+    });
+    state.mistakes.forEach(function (m) {
+      if (m.at >= start && m.at < end) rep.made++;
+      if (m.resolved && m.resolvedAt >= start && m.resolvedAt < end) rep.mastered++;
+    });
+    rep.active = !!(rep.reviews || rep.qn || rep.fn);
+    var bits = [];
+    if (rep.reviews) bits.push(plural(rep.reviews, 'review'));
+    if (rep.qn) bits.push(rep.qr + '/' + rep.qn + ' quiz questions right');
+    if (rep.mastered) bits.push(plural(rep.mastered, 'mistake') + ' mastered');
+    rep.headline = bits.join(', ') || 'a quiet week';
+    return rep;
+  }
+  // Topics whose "needs work" score moved by a clear margin between two snapshots.
+  function weekMovers(a, b) {
+    var up = [], down = [];
+    var keys = {}; Object.keys(a.sc).concat(Object.keys(b.sc)).forEach(function (k) { keys[k] = true; });
+    Object.keys(keys).forEach(function (k) {
+      var d = (b.sc[k] || 0) - (a.sc[k] || 0);
+      if (d <= -0.8 && a.sc[k]) up.push({ key: k, d: -d });
+      else if (d >= 0.8) down.push({ key: k, d: d });
+    });
+    up.sort(function (x, y) { return y.d - x.d; }); down.sort(function (x, y) { return y.d - x.d; });
+    return { improved: up.slice(0, 6), slipped: down.slice(0, 6) };
   }

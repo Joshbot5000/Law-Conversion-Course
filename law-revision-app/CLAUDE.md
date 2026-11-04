@@ -45,4 +45,10 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - Suggestions (`topicInsights`/`suggestions` in js_memory.js, UI in `src/js_progress.js`) combine quiz accuracy, open mistakes,
   quick-test misses, review lapses and exam dates. Quick test (`src/js_flash.js`) only shows the owner's own cards — never invented law.
 - Quizzes (`src/js_quiz.js`): practice mode aims slots at mistakes (`qz.targets`), and `qz.sources` limits the pool to cards linked to or
-  named in chosen sources, passing source extracts into the prompt.
+  named in chosen sources, passing source extracts into the prompt. `qz.timed` = timed exam (102 s a question, clock pauses while
+  questions are written, results recorded only on submit).
+- Quick test (`src/js_flash.js`) modes: principle / case / statute flashcards (typed answers checked by Claude against the card only),
+  distinguish two cases (same topic), fill in the blank (local check with typo tolerance). `fl.limit` caps a run (Today's session uses 5).
+- Weekly summary: `perf.w` / `perf.wPrev` = weekly snapshots of topic scores, rolled on the first visit of a week (`maybeWeeklyRoll`).
+- Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
+  (hook `sessionModalClosed` in `closeModal`).

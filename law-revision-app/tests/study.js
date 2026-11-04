@@ -74,7 +74,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 
   // 4. Quick test
   await page.click('#flashBtn'); await page.waitForSelector('#flashModal:not([hidden]) .fl-gen');
-  ok((await page.$$('.fl-gen-btn')).length === 3, 'three buttons: principle, case, statute');
+  ok((await page.$$('[data-flgen="principle"], [data-flgen="case"], [data-flgen="statute"]')).length === 3, 'buttons to generate a principle, case and statute');
   await page.click('[data-flgen="case"]');
   await page.waitForSelector('.fl-title');
   ok((await page.textContent('.fl-meta')).includes('Case') && !(await page.$('.fl-back')), 'a random case appears, answer hidden');

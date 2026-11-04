@@ -71,6 +71,12 @@
       out.push({ type: 'principle', name: 'Invented rule for testing', citation: 'Key authorities: Nobody v Nothing', topic: 'Testing', facts: '', ratio: 'A rule the text never states.', strategy: '', tags: ['test'], page: 1, quote: 'This sentence is not in the source at all.' });
       return JSON.stringify(out);
     }
+    if (text.indexOf('quick test answer') !== -1) {
+      var pair = text.indexOf('DISTINGUISH') !== -1;
+      var r = { verdict: 'partly', right: ['You identified the main rule.'], missed: ['You left out the material facts.'], wrong: [] };
+      if (pair) r.model = 'Model answer: the first case turns on its own facts, while the second applies a different rule from the cards.';
+      return JSON.stringify(r);
+    }
     if (text.indexOf('Rewrite ONLY the options') !== -1) {
       window.__mock.repairs = (window.__mock.repairs || 0) + 1;
       var list = JSON.parse(text.slice(text.indexOf('\n[') + 1));

@@ -241,6 +241,7 @@
     openModals = openModals.filter(function (x) { return x !== m; });
     if (!openModals.length) document.body.classList.remove('modal-open');
     if (typeof m._onClose === 'function') m._onClose();
+    sessionModalClosed(m);
     if (dismissed && typeof m._onDismiss === 'function') { var fn = m._onDismiss; m._onDismiss = null; fn(); }
     var f = lastFocus.pop();
     if (f && typeof f.focus === 'function' && document.contains(f)) { try { f.focus(); } catch (e) { /* ignore */ } }

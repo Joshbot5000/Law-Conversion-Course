@@ -105,6 +105,7 @@
         if (w) openReview({ module: w.module, drillIds: w.ids, label: 'Drill: ' + w.topic });
       } else if (a === 'sg-practise' || a === 'sg-flash') suggestionAction(a, ($('#today')._sugg || [])[+b.getAttribute('data-i')]);
       else if (a === 'progress') openProgress('suggest');
+      else if (a === 'session') openSession();
       else if (a === 'plan') openPlan();
       else if (a === 'verifyq') openVerify(state.filter);
       else if (a === 'unverified') { state.settings.statusFilter = 'unverified'; saveUI(); renderAll(); $('#entries').scrollIntoView({ behavior: 'smooth' }); }
@@ -139,6 +140,7 @@
     bindRichText();
     bindFlash();
     bindProgress();
+    bindSession();
     $('#entryForm').addEventListener('click', function (ev) { var l = ev.target.closest('[data-focus]'); if (l) $('#' + l.getAttribute('data-focus')).focus(); });
     $('#fabQuickNote').addEventListener('click', function () { setFab(false); openLectureNotes({ newNote: true }); });
     $('#commentSave').addEventListener('click', saveComment);

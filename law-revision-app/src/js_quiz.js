@@ -67,7 +67,7 @@
   function openQuiz() {
     if (!qz || qz.finished || !qz.questions || !qz.questions.length) {
       var prev = qz || {};
-      qz = { step: 'setup', module: prev.module || state.filter, topics: prev.topics || [], sources: prev.sources || [], focus: prev.focus || 'mixed', n: prev.n || 10, diff: prev.diff || 'adaptive' };
+      qz = { step: 'setup', module: prev.module || state.filter, topics: prev.topics || [], sources: prev.sources || [], focus: prev.focus || 'mixed', n: prev.n || 10, diff: prev.diff || 'adaptive', timed: prev.mode !== 'practice' && prev.timed === true };
     }
     renderQuiz();
     openModal($('#quizModal'));
@@ -94,6 +94,8 @@
         '<div class="form-field"><label class="lbl" for="qzFocus">Cards to draw on</label><select id="qzFocus"><option value="mixed">A rotating mix</option><option value="weak"' + (qz.focus === 'weak' ? ' selected' : '') + '>Ones I find hard or are due</option><option value="key"' + (qz.focus === 'key' ? ' selected' : '') + '>★ Key authorities first</option></select></div>' +
         '<div class="form-field"><label class="lbl" for="qzDiff">Difficulty</label><select id="qzDiff"><option value="adaptive">Adaptive – follows how I\'m doing</option>' +
           [1, 2, 3, 4, 5].map(function (l) { return '<option value="' + l + '"' + (String(qz.diff) === String(l) ? ' selected' : '') + '>' + QZ_LEVELS[l].name + ' only</option>'; }).join('') + '</select></div>' +
+        '<div class="form-field full"><label class="lbl" for="qzTimed">Mode</label><select id="qzTimed"><option value="practice">Practice — see the answer after each question</option>' +
+          '<option value="timed"' + (qz.timed ? ' selected' : '') + '>Timed exam — SQE pace (1 min 42 s a question), results at the end</option></select></div>' +
         '</div>' +
         '<div class="qz-topics-head"><span class="lbl">Topics <span class="muted">(' + (qz.topics.length ? qz.topics.length + ' selected' : 'none ticked = every topic') + ')</span></span>' +
           '<span><button type="button" class="linklike" data-qz="all-topics">Select all</button> · <button type="button" class="linklike" data-qz="no-topics">Clear</button></span></div>' +
@@ -110,8 +112,10 @@
             ? '<p class="step-note warn">' + esc(qz.batchError) + '</p>'
             : '<p style="margin:24px 0"><span class="spinner"></span>Writing your next questions, pitched to how you\'re doing…</p>');
         foot.innerHTML = qz.batchError ? '<button type="button" class="btn" data-qz="finish">Finish here</button><button type="button" class="btn btn-primary" data-qz="retry">Try again</button>' : '<button type="button" class="btn" data-qz="finish">Finish here</button>';
+        if (qz.timed) body.insertAdjacentHTML('afterbegin', '<p class="muted qz-paused">⏸ The clock is paused while questions are written.</p>');
         return;
       }
+      if (qz.timed) { renderExamQuestion(body, foot); return; }
       var q = qz.questions[qz.idx], chosen = qz.answers[qz.idx];
       body.innerHTML = '<div class="review-progress"><div class="bar"><i style="width:' + Math.round(qz.idx / qz.total * 100) + '%"></i></div><span>Question ' + (qz.idx + 1) + ' of ' + qz.total + ' · ' + qz.score + ' right</span></div>' +
         '<div class="qz-meta"><span class="chip">' + esc(topicLabel(q.topic)) + '</span><span class="chip qz-lv lv' + q.level + '">' + QZ_LEVELS[q.level].name + '</span>' +
@@ -132,6 +136,54 @@
       renderQuizDone(body, foot);
     }
   }
+  /* ---- timed exam mode: SQE pace, no feedback until you submit ---- */
+  var QZ_SECS = 102, qzClock = null;
+  function fmtClock(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + pad2(s % 60); }
+  function renderExamQuestion(body, foot) {
+    var letters = 'ABCDE', q = qz.questions[qz.idx], chosen = qz.answers[qz.idx];
+    var done = qz.answers.filter(function (a) { return a != null; }).length;
+    body.innerHTML = '<div class="review-progress"><div class="bar"><i style="width:' + Math.round(done / qz.total * 100) + '%"></i></div><span>Question ' + (qz.idx + 1) + ' of ' + qz.total + ' · ' + done + ' answered</span>' +
+        '<span class="qz-clock' + (qz.timeLeft <= 60 ? ' low' : '') + '" id="qzClock" title="Time left">⏱ ' + fmtClock(qz.timeLeft) + '</span></div>' +
+      '<div class="qz-meta"><span class="chip">' + esc(topicLabel(q.topic)) + '</span><span class="chip qz-exam-chip">Timed exam</span></div>' +
+      '<div class="quiz-stem">' + esc(q.stem) + '</div><p class="quiz-q">' + esc(q.question) + '</p>' +
+      '<div class="quiz-opts">' + q.options.map(function (o, i) {
+        return '<button type="button" class="quiz-opt' + (chosen === i ? ' picked' : '') + '" data-opt="' + i + '" aria-pressed="' + (chosen === i) + '"><span class="letter">' + letters[i] + '</span><span>' + esc(o) + '</span></button>';
+      }).join('') + '</div>' +
+      '<p class="muted qz-exam-note">You can change your answer until you submit. Results and explanations come at the end.</p>';
+    var last = qz.idx + 1 >= qz.total;
+    foot.innerHTML = '<button type="button" class="btn" data-qz="submit">Submit now</button><span class="spacer"></span>' +
+      (qz.idx > 0 ? '<button type="button" class="btn" data-qz="back">← Back</button>' : '') +
+      '<button type="button" class="btn btn-primary" data-qz="' + (last ? 'submit' : 'next') + '">' + (last ? 'Submit answers' : (chosen == null ? 'Skip →' : 'Next →')) + '</button>';
+  }
+  // The clock only runs while a written question is on screen.
+  function startClock() {
+    clearInterval(qzClock);
+    qzClock = setInterval(function () {
+      if (!qz || !qz.timed || qz.step !== 'play') { clearInterval(qzClock); return; }
+      if ($('#quizModal').hidden || qz.idx >= qz.questions.length) return;
+      qz.timeLeft--;
+      var c = $('#qzClock');
+      if (c) { c.textContent = '⏱ ' + fmtClock(qz.timeLeft); c.classList.toggle('low', qz.timeLeft <= 60); }
+      if (qz.timeLeft <= 0) { toast('Time\'s up — your answers have been submitted.'); submitExam(); }
+    }, 1000);
+  }
+  function submitExam() {
+    clearInterval(qzClock);
+    if (qz.ctl) qz.ctl.abort();
+    qz.writing = false;
+    qz.score = 0;
+    qz.questions.forEach(function (q, i) {
+      var a = qz.answers[i];
+      if (a == null) return;
+      var right = a === q.answer;
+      if (right) qz.score++;
+      recordAnswer(q, right);
+      memoryQuizAnswer(q, a, right);
+    });
+    qz.timeUsed = qz.total * QZ_SECS - qz.timeLeft;
+    qz.step = 'done'; qz.finished = true;
+    renderQuiz();
+  }
   function renderQuizDone(body, foot) {
     var missed = [], byTopic = {}, wrong = [], answered = 0;
     qz.questions.forEach(function (q, i) {
@@ -150,7 +202,10 @@
     var filter = qz.reviewFilter || (wrong.length ? 'wrong' : 'all');
     var shown = qz.questions.map(function (q, i) { return i; }).filter(function (i) { return qz.answers[i] != null && (filter === 'all' || qz.answers[i] !== qz.questions[i].answer); });
     var letters = 'ABCDE';
-    body.innerHTML = '<div class="rv-done"><h3>' + qz.score + ' / ' + answered + '</h3><p class="muted">' +
+    var unanswered = qz.timed ? Math.max(0, qz.total - answered) : 0;
+    body.innerHTML = (qz.timed ? '<p class="qz-timeline">⏱ Timed exam · time used ' + fmtClock(qz.timeUsed || 0) + ' of ' + fmtClock(qz.total * QZ_SECS) +
+        (unanswered ? ' · ' + plural(unanswered, 'question') + ' not answered' : '') + '</p>' : '') +
+      '<div class="rv-done"><h3>' + qz.score + ' / ' + (qz.timed ? qz.total : answered) + '</h3><p class="muted">' +
       (answered && qz.score === answered ? 'Perfect score.' : answered && qz.score / answered >= 0.6 ? 'Good work. Go over the ones you missed below.' : 'Worth another look — go over the ones you missed below.') + '</p></div>' +
       '<div class="qz-results">' + Object.keys(byTopic).map(function (k) {
         var t = byTopic[k], st = state.prefs.qstats[k];
@@ -418,6 +473,7 @@
     qz.module = $('#qzModule').value; qz.focus = $('#qzFocus').value; qz.n = +$('#qzN').value;
     qz.diff = $('#qzDiff').value === 'adaptive' ? 'adaptive' : +$('#qzDiff').value;
     qz.mode = 'quiz'; qz.targets = null; qz.practiceOnly = false; qz.error = '';
+    qz.timed = $('#qzTimed').value === 'timed';
     qz.srcText = null; qz.srcNorm = null;
     if (!qz.sources || !qz.sources.length) return beginQuiz();
     $('#quizBody').innerHTML = '<p style="margin:20px 0"><span class="spinner"></span>Reading your chosen sources…</p>';
@@ -437,10 +493,19 @@
     }
     qz.total = qz.n; qz.questions = []; qz.answers = []; qz.idx = 0; qz.score = 0; qz.dropped = 0; qz.used = {}; qz.topicCount = {}; qz.finished = false; qz.logged = false; qz.reviewFilter = null;
     qz.step = 'writing';
+    if (qz.timed) { qz.timeLeft = qz.total * QZ_SECS; startClock(); }
     $('#quizBody').innerHTML = '<p style="margin:20px 0"><span class="spinner"></span>' + (qz.mode === 'practice' ? 'Writing fresh questions on the points you got wrong…' :
       'Writing your first ' + Math.min(QZ_BATCH, qz.total) + ' questions from ' + cardsWord(pool.length) + '… the rest are written while you answer.') + '</p>';
     $('#quizFoot').innerHTML = '<button type="button" class="btn" data-qz="cancel">Cancel</button>';
     requestBatch();
+  }
+  // A short adaptive quiz on particular topics (used by Today's session).
+  function startTopicQuiz(keys, n) {
+    if (!claudeCaps.sample) return false;
+    qz = { step: 'setup', module: 'all', topics: keys.slice(), sources: [], focus: 'weak', diff: 'adaptive', n: n || 5, timed: false, mode: 'quiz', targets: null };
+    if ($('#quizModal').hidden) openModal($('#quizModal'));
+    beginQuiz();
+    return true;
   }
   // Practice aimed at particular mistakes (and, if given, a topic around them).
   function startPractice(mistakeIds, opts) {
@@ -476,6 +541,17 @@
     else if (a === 'cancel') { if (qz.ctl) qz.ctl.abort(); qz.step = 'setup'; qz.writing = false; renderQuiz(); }
     else if (a === 'all-topics') { qz.topics = quizTopicList(qz.module).map(function (t) { return t.key; }); renderQuiz(); }
     else if (a === 'no-topics') { qz.topics = []; renderQuiz(); }
+    else if (qz.timed && qz.step === 'play' && (a === 'next' || a === 'back' || a === 'submit' || a === 'finish')) {
+      if (a === 'back') { qz.idx = Math.max(0, qz.idx - 1); renderQuiz(); }
+      else if (a === 'next') { qz.idx++; renderQuiz(); maybeRequestMore(); }
+      else {
+        var left = qz.total - qz.answers.filter(function (x) { return x != null; }).length;
+        if (left && qz.timeLeft > 0) {
+          dialog({ title: 'Submit your answers?', message: plural(left, 'question') + ' not answered yet. Unanswered questions count as wrong.', buttons: [{ label: 'Keep going', value: false }, { label: 'Submit', value: true, style: 'btn-primary' }] })
+            .then(function (go) { if (go) submitExam(); });
+        } else submitExam();
+      }
+    }
     else if (a === 'next') {
       if (qz.idx + 1 < qz.total) { qz.idx++; renderQuiz(); maybeRequestMore(); }
       else { qz.step = 'done'; qz.finished = true; renderQuiz(); }
@@ -483,7 +559,7 @@
     else if (a === 'finish') { if (qz.ctl) qz.ctl.abort(); qz.writing = false; qz.step = 'done'; qz.finished = true; renderQuiz(); }
     else if (a === 'again') {
       var ps = qz.mode === 'practice' && qz.prevSetup ? qz.prevSetup : qz;
-      qz = { step: 'setup', module: ps.module || state.filter, topics: ps.topics || [], sources: ps.sources || [], focus: ps.focus || 'mixed', n: ps.n || 10, diff: ps.diff || 'adaptive' };
+      qz = { step: 'setup', module: ps.module || state.filter, topics: ps.topics || [], sources: ps.sources || [], focus: ps.focus || 'mixed', n: ps.n || 10, diff: ps.diff || 'adaptive', timed: ps.timed === true && qz.mode !== 'practice' };
       renderQuiz();
     }
     else if (a === 'show-wrong' || a === 'show-all') { qz.reviewFilter = a === 'show-wrong' ? 'wrong' : 'all'; renderQuiz(); }
@@ -507,6 +583,7 @@
     else if (t.id === 'qzN') qz.n = +t.value;
     else if (t.id === 'qzFocus') qz.focus = t.value;
     else if (t.id === 'qzDiff') qz.diff = t.value === 'adaptive' ? 'adaptive' : +t.value;
+    else if (t.id === 'qzTimed') qz.timed = t.value === 'timed';
     else if (t.matches('[data-qsrc]')) {
       var sid = t.getAttribute('data-qsrc');
       qz.sources = (qz.sources || []).filter(function (x) { return x !== sid; });
@@ -522,6 +599,7 @@
   }
   function answerQuiz(i) {
     var q = qz.questions[qz.idx];
+    if (q && qz.timed && qz.step === 'play') { qz.answers[qz.idx] = i; renderQuiz(); return; }
     if (!q || qz.answers[qz.idx] != null) return;
     qz.answers[qz.idx] = i;
     var right = i === q.answer;

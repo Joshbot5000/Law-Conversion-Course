@@ -3,8 +3,9 @@
 A single-page revision app for the law conversion course: flashcards with spaced repetition, sources you can search
 and quote, lecture notes with automatic topic detection, Word-style formatting on cards, adaptive multi-topic quizzes
 (optionally limited to chosen sources) with an end-of-quiz review and practice aimed at your mistakes, a saved
-mistakes log, Quick test flashcards (generate a principle / case / statute), long-term study memory with
-"Work on next" suggestions and a progress view, mock exams, and study tools (check cards against sources,
+mistakes log, a timed exam mode, Quick test (generate a principle / case / statute with Claude checking your answer,
+distinguish two cases, fill in the blank), a guided Today's session, long-term study memory with "Work on next"
+suggestions, a weekly summary and a progress view, mock exams, and study tools (check cards against sources,
 find duplicates, exam pacing).
 
 - **Live app:** https://claude.ai/artifact/G4fkVJRbQpM1YVNqg5aAs3 (published on claude.ai)
