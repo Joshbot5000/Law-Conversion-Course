@@ -88,6 +88,7 @@
     var src = readLocalSources();
     state.sources = src.meta.map(sanitizeSourceMeta).filter(Boolean);
     loadLocalNotes();
+    loadLocalMemory();
     state.loaded = true;
     setSync('ok');
     renderAll();
@@ -160,6 +161,7 @@
       if (qz && qz.step === 'setup' && !$('#quizModal').hidden) renderQuiz();
     }, fail);
     startNotesCloud(db);
+    startMemoryCloud(db);
     db.collection('src').onSnapshot(function (snap) {
       state.sources = snap.docs.map(function (d) { return sanitizeSourceMeta(d.data()); }).filter(Boolean)
         .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; });

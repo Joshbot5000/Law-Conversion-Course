@@ -103,7 +103,9 @@
       } else if (a === 'drill') {
         var w = ($('#today')._weak || [])[+b.getAttribute('data-i')];
         if (w) openReview({ module: w.module, drillIds: w.ids, label: 'Drill: ' + w.topic });
-      } else if (a === 'plan') openPlan();
+      } else if (a === 'sg-practise' || a === 'sg-flash') suggestionAction(a, ($('#today')._sugg || [])[+b.getAttribute('data-i')]);
+      else if (a === 'progress') openProgress('suggest');
+      else if (a === 'plan') openPlan();
       else if (a === 'verifyq') openVerify(state.filter);
       else if (a === 'unverified') { state.settings.statusFilter = 'unverified'; saveUI(); renderAll(); $('#entries').scrollIntoView({ behavior: 'smooth' }); }
     });
@@ -135,6 +137,8 @@
     $('#dupBody').addEventListener('click', dupClick);
     bindNotes();
     bindRichText();
+    bindFlash();
+    bindProgress();
     $('#entryForm').addEventListener('click', function (ev) { var l = ev.target.closest('[data-focus]'); if (l) $('#' + l.getAttribute('data-focus')).focus(); });
     $('#fabQuickNote').addEventListener('click', function () { setFab(false); openLectureNotes({ newNote: true }); });
     $('#commentSave').addEventListener('click', saveComment);
@@ -200,7 +204,7 @@
     // Quiz
     $('#quizBtn').addEventListener('click', openQuiz);
     $('#quizModal').addEventListener('click', function (ev) {
-      var a = ev.target.closest('[data-qz]'); if (a) return quizAction(a.getAttribute('data-qz'));
+      var a = ev.target.closest('[data-qz]'); if (a) return quizAction(a.getAttribute('data-qz'), a.getAttribute('data-i'));
       var o = ev.target.closest('[data-opt]'); if (o) return answerQuiz(+o.getAttribute('data-opt'));
       var p = ev.target.closest('[data-peek]'); if (p) return openPeek(p.getAttribute('data-peek'));
     });

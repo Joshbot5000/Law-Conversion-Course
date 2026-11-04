@@ -3,7 +3,7 @@ import os
 D=os.path.dirname(os.path.abspath(__file__))+'/'
 OUT=os.path.join(D,'..')+'/'
 head=open(D+'head.html').read(); body=open(D+'body.html').read()
-parts=['data.js','js_core.js','js_friends.js','js_store.js','js_render.js','js_actions.js','js_sources.js','js_ask.js','js_quiz.js','js_quiz_mock.js','js_tools.js','js_notes.js','js_richtext.js','js_events.js']
+parts=['data.js','js_core.js','js_friends.js','js_store.js','js_render.js','js_actions.js','js_sources.js','js_ask.js','js_quiz.js','js_quiz_mock.js','js_tools.js','js_notes.js','js_richtext.js','js_memory.js','js_flash.js','js_progress.js','js_events.js']
 js="<script>\n/* ======================================================================\n   LAW REVISION — APPLICATION LOGIC (vanilla JavaScript)\n   ====================================================================== */\n(function () {\n  'use strict';\n\n" + ''.join(open(D+p).read().rstrip('\n')+'\n\n' for p in parts) + "</script>\n"
 open(D+'app.js','w').write(js.replace('<script>','',1).replace('</script>\n',''))
 comment='''<!--

@@ -325,12 +325,7 @@
     var weak = weakTopics(mod, 3);
     var inMod = state.entries.filter(function (e) { return mod === 'all' || e.module === mod; });
     var ver = inMod.filter(function (e) { return e.verified; }).length;
-    var weakHtml = '<section><h3>Weak spots</h3>' + (weak.length
-      ? '<div class="weak-list">' + weak.map(function (g, i) {
-        return '<div class="weak-item"><div><b title="' + esc(g.topic) + '">' + esc(g.topic) + '</b><span>' + (mod === 'all' ? esc(MODULE_LABEL[g.module]) + ' · ' : '') +
-          plural(g.lapses, 'slip') + ' across ' + cardsWord(g.cards) + '</span></div><button type="button" class="btn btn-sm" data-today="drill" data-i="' + i + '">Drill</button></div>';
-      }).join('') + '</div>'
-      : '<p class="muted" style="margin:0;font-size:13px">Topics you keep forgetting will show here after a few reviews.</p>') +
+    var weakHtml = '<section class="sg-section">' + workOnNextHTML(mod) +
       '<div class="verify-line"><span>Verified against your sources: <b>' + ver + '</b> of ' + inMod.length + '</span>' +
       (ver < inMod.length ? '<span><button type="button" class="btn btn-sm" data-today="verifyq">✓ Check cards</button> <button type="button" class="linklike" data-today="unverified">Show unchecked</button></span>' : '') + '</div></section>';
     box.innerHTML = main + forecast + weakHtml;

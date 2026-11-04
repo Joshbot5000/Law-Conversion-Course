@@ -142,7 +142,8 @@
         app: 'Law Revision Repository', format: 'law-revision-backup', version: SCHEMA_VERSION, exportedAt: nowISO(),
         count: state.entries.length, entries: state.entries, progress: state.progress, stats: state.stats, prefs: state.prefs,
         sources: sources.filter(Boolean),
-        notes: state.notes.filter(function (n) { return !n._draft; }).map(noteForStorage)
+        notes: state.notes.filter(function (n) { return !n._draft; }).map(noteForStorage),
+        perf: state.perf, mistakes: state.mistakes
       };
       var json = JSON.stringify(payload, null, 1);
       var d = new Date();
@@ -201,6 +202,7 @@
         ]
       }).then(function (choice) {
         if (!choice) return;
+        importMemory(data, choice);
         if (importedNotes) { var nn = importNotes(importedNotes, choice); if (nn) setTimeout(function () { toast(plural(nn, 'lecture note') + ' imported.', { type: 'success' }); }, 600); }
         var seen = {};
         clean.forEach(function (e) { if (seen[e.id]) e.id = uid(); seen[e.id] = true; });

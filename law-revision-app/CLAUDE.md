@@ -39,3 +39,10 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - Offline copy uses localStorage instead (`lawRevisionApp.v1`).
 - Claude calls go through `claudeCaps.sample` / `claudeCaps.sample.json` (no API keys; uses the owner's claude.ai usage).
 - Card formatting (`src/js_richtext.js`): plain text stays in `facts/ratio/strategy`; sanitised HTML in `fmt`.
+- Study memory (`src/js_memory.js`): `memory/perf` = `{c: {cardId: [quizN, quizRight, flashN, flashScore, lastWrongMs, lastMs]}, s: [recent sessions]}`;
+  `mistakes/<id>` = every wrong quiz answer with the full question, `resolved` once got right twice in practice (or ticked off).
+  Local/friends: one kv key `lawRevisionApp.v1.memory`. Topic quiz levels stay in `meta/prefs.qstats`. Both go in backups.
+- Suggestions (`topicInsights`/`suggestions` in js_memory.js, UI in `src/js_progress.js`) combine quiz accuracy, open mistakes,
+  quick-test misses, review lapses and exam dates. Quick test (`src/js_flash.js`) only shows the owner's own cards — never invented law.
+- Quizzes (`src/js_quiz.js`): practice mode aims slots at mistakes (`qz.targets`), and `qz.sources` limits the pool to cards linked to or
+  named in chosen sources, passing source extracts into the prompt.

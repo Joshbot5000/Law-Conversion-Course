@@ -34,6 +34,7 @@
     <section>
       <div class="side-heading">Study tools</div>
       <div class="side-actions">
+        <button class="btn" id="progressBtn" type="button">📈 My progress &amp; suggestions</button>
         <button class="btn" id="verifyBtn" type="button">✓ Check cards against sources</button>
         <button class="btn" id="planBtn" type="button">📅 Exam dates &amp; study plan</button>
         <button class="btn" id="dupBtn" type="button">⧉ Find duplicates</button>
@@ -87,6 +88,7 @@
         <button class="btn btn-notes" id="notesBtn" type="button" title="Lecture notes (N)">📝 <span class="btn-label">Notes</span></button>
         <button class="btn btn-ask" id="askBtn" type="button" title="Ask about anything you don't understand">? <span class="btn-label">Ask</span></button>
         <button class="btn" id="quizBtn" type="button" title="Single best answer questions from your cards">☑ <span class="btn-label">Quiz</span></button>
+        <button class="btn btn-flash" id="flashBtn" type="button" title="Generate a random principle, case or statute to test yourself">⚡ <span class="btn-label">Quick test</span></button>
         <button class="btn btn-exam" id="mockBtn" type="button">✎ <span class="btn-label">Mock exam</span></button>
       </div>
     </header>
@@ -448,6 +450,33 @@
     </div>
     <div class="modal-body" id="quizBody"></div>
     <div class="modal-foot" id="quizFoot"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: QUICK TEST (generate a principle / case / statute)
+     ================================================================ -->
+<div class="modal" id="flashModal" hidden role="dialog" aria-modal="true" aria-labelledby="flashTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="flashTitle">Quick test</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="flashBody"></div>
+    <div class="modal-foot" id="flashFoot"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: MY PROGRESS & SUGGESTIONS
+     ================================================================ -->
+<div class="modal" id="progressModal" hidden role="dialog" aria-modal="true" aria-labelledby="progressTitle">
+  <div class="modal-box modal-wide">
+    <div class="modal-head">
+      <h2 id="progressTitle">My progress</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="progressBody"></div>
   </div>
 </div>
 

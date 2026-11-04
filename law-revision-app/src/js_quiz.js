@@ -67,7 +67,7 @@
   function openQuiz() {
     if (!qz || qz.finished || !qz.questions || !qz.questions.length) {
       var prev = qz || {};
-      qz = { step: 'setup', module: prev.module || state.filter, topics: prev.topics || [], focus: prev.focus || 'mixed', n: prev.n || 10, diff: prev.diff || 'adaptive' };
+      qz = { step: 'setup', module: prev.module || state.filter, topics: prev.topics || [], sources: prev.sources || [], focus: prev.focus || 'mixed', n: prev.n || 10, diff: prev.diff || 'adaptive' };
     }
     renderQuiz();
     openModal($('#quizModal'));
@@ -98,6 +98,7 @@
         '<div class="qz-topics-head"><span class="lbl">Topics <span class="muted">(' + (qz.topics.length ? qz.topics.length + ' selected' : 'none ticked = every topic') + ')</span></span>' +
           '<span><button type="button" class="linklike" data-qz="all-topics">Select all</button> · <button type="button" class="linklike" data-qz="no-topics">Clear</button></span></div>' +
         '<div class="qz-topics">' + (topicsHtml || '<p class="muted">Add cards with topics to choose from.</p>') + '</div>' +
+        quizSourcesHTML() +
         (qz.error ? '<p class="step-note warn" style="margin-top:12px">' + esc(qz.error) + '</p>' : '') +
         (claudeCaps.sample ? '' : '<p class="step-note warn" style="margin-top:12px">Quizzes are written by Claude, which works when the app is opened in claude.ai.</p>');
       foot.innerHTML = '<span class="foot-note spacer">Written five at a time, so you can start straight away.</span><button type="button" class="btn" data-close>Close</button><button type="button" class="btn btn-primary" data-qz="go"' + (claudeCaps.sample ? '' : ' disabled') + '>✦ Start quiz</button>';
@@ -113,7 +114,8 @@
       }
       var q = qz.questions[qz.idx], chosen = qz.answers[qz.idx];
       body.innerHTML = '<div class="review-progress"><div class="bar"><i style="width:' + Math.round(qz.idx / qz.total * 100) + '%"></i></div><span>Question ' + (qz.idx + 1) + ' of ' + qz.total + ' · ' + qz.score + ' right</span></div>' +
-        '<div class="qz-meta"><span class="chip">' + esc(topicLabel(q.topic)) + '</span><span class="chip qz-lv lv' + q.level + '">' + QZ_LEVELS[q.level].name + '</span></div>' +
+        '<div class="qz-meta"><span class="chip">' + esc(topicLabel(q.topic)) + '</span><span class="chip qz-lv lv' + q.level + '">' + QZ_LEVELS[q.level].name + '</span>' +
+          (q.target ? '<span class="chip qz-practice">Practice on an earlier mistake</span>' : '') + '</div>' +
         '<div class="quiz-stem">' + esc(q.stem) + '</div><p class="quiz-q">' + esc(q.question) + '</p>' +
         '<div class="quiz-opts">' + q.options.map(function (o, i) {
           var cls = chosen == null ? '' : i === q.answer ? ' right' : i === chosen ? ' wrong' : '';
@@ -121,36 +123,115 @@
         }).join('') + '</div>' +
         (chosen != null ? '<div class="quiz-expl"><b>' + (chosen === q.answer ? '✓ Correct.' : '✗ The best answer is ' + letters[q.answer] + '.') + '</b> ' + esc(q.explanation) +
           (q.lvChange ? '<div class="qz-lvchange">' + esc(q.lvChange) + '</div>' : '') +
+          (q.mastered ? '<div class="qz-lvchange">★ Mastered: you\'ve now got this point right twice, so it\'s marked as sorted in your mistakes log.</div>' : '') +
+          (chosen !== q.answer ? '<div class="qz-saved">Saved to your mistakes log — you can go over it again at the end, or any time from My progress.</div>' : '') +
           '<div class="quiz-cards">' + q.cards.map(function (id) { var c = byId(id); return c ? '<button type="button" class="tag" data-peek="' + esc(id) + '">' + esc(c.name) + '</button>' : ''; }).join('') + '</div></div>' : '');
-      foot.innerHTML = '<span class="foot-note spacer">Built only from your cards. If something looks wrong, check the card.</span>' +
+      foot.innerHTML = '<button type="button" class="btn" data-qz="finish" title="Stop here and go over what you\'ve answered">End quiz</button><span class="foot-note spacer">Built only from your cards. If something looks wrong, check the card.</span>' +
         (chosen != null ? '<button type="button" class="btn btn-primary" data-qz="next">' + (qz.idx + 1 < qz.total ? 'Next question' : 'See results') + '</button>' : '');
     } else if (qz.step === 'done') {
-      var missed = [], byTopic = {};
-      qz.questions.forEach(function (q, i) {
-        if (qz.answers[i] == null) return;
-        var t = byTopic[q.topic] = byTopic[q.topic] || { n: 0, r: 0 };
-        t.n++; if (qz.answers[i] === q.answer) t.r++;
-        else q.cards.forEach(function (id) { if (byId(id) && missed.indexOf(id) === -1) missed.push(id); });
-      });
-      var answered = qz.answers.filter(function (a) { return a != null; }).length;
-      body.innerHTML = '<div class="rv-done"><h3>' + qz.score + ' / ' + answered + '</h3><p class="muted">' +
-        (answered && qz.score === answered ? 'Perfect score.' : answered && qz.score / answered >= 0.6 ? 'Good work. Review the ones you missed below.' : 'Worth another look at these cards.') + '</p></div>' +
-        '<div class="qz-results">' + Object.keys(byTopic).map(function (k) {
-          var t = byTopic[k], s = state.prefs.qstats[k];
-          return '<div class="qz-res"><span>' + esc(topicLabel(k)) + '</span><b>' + t.r + '/' + t.n + '</b><small>' + (s ? 'now ' + levelName(s.lv) : '') + '</small></div>';
-        }).join('') + '</div>' +
-        (missed.length ? '<div class="field-label" style="margin-top:14px">Cards behind the questions you missed</div><div class="quiz-cards">' +
-          missed.map(function (id) { return '<button type="button" class="tag" data-peek="' + esc(id) + '">' + esc(byId(id).name) + '</button>'; }).join('') + '</div>' : '');
-      qz.missed = missed;
-      foot.innerHTML = (missed.length ? '<button type="button" class="btn spacer" data-qz="due">Add missed cards to today\'s review</button>' : '<span class="spacer"></span>') +
-        '<button type="button" class="btn" data-qz="again">New quiz</button><button type="button" class="btn btn-primary" data-close>Done</button>';
+      renderQuizDone(body, foot);
     }
+  }
+  function renderQuizDone(body, foot) {
+    var missed = [], byTopic = {}, wrong = [], answered = 0;
+    qz.questions.forEach(function (q, i) {
+      if (qz.answers[i] == null) return;
+      answered++;
+      var t = byTopic[q.topic] = byTopic[q.topic] || { n: 0, r: 0 };
+      t.n++;
+      if (qz.answers[i] === q.answer) t.r++;
+      else { wrong.push(i); q.cards.forEach(function (id) { if (byId(id) && missed.indexOf(id) === -1) missed.push(id); }); }
+    });
+    if (!qz.logged && answered) {
+      qz.logged = true;
+      memorySession(qz.mode === 'practice' ? 'practice' : 'quiz', answered, qz.score, Object.keys(byTopic));
+    }
+    qz.missed = missed;
+    var filter = qz.reviewFilter || (wrong.length ? 'wrong' : 'all');
+    var shown = qz.questions.map(function (q, i) { return i; }).filter(function (i) { return qz.answers[i] != null && (filter === 'all' || qz.answers[i] !== qz.questions[i].answer); });
+    var letters = 'ABCDE';
+    body.innerHTML = '<div class="rv-done"><h3>' + qz.score + ' / ' + answered + '</h3><p class="muted">' +
+      (answered && qz.score === answered ? 'Perfect score.' : answered && qz.score / answered >= 0.6 ? 'Good work. Go over the ones you missed below.' : 'Worth another look — go over the ones you missed below.') + '</p></div>' +
+      '<div class="qz-results">' + Object.keys(byTopic).map(function (k) {
+        var t = byTopic[k], st = state.prefs.qstats[k];
+        return '<div class="qz-res"><span>' + esc(topicLabel(k)) + '</span><b>' + t.r + '/' + t.n + '</b><small>' + (st ? 'now ' + levelName(st.lv) : '') + '</small></div>';
+      }).join('') + '</div>' +
+      (wrong.length ? '<div class="qz-practise-all"><div><b>Turn your mistakes into strengths</b><span>Fresh questions on exactly the points you got wrong, from new angles. Get a point right twice and it\'s marked as mastered.</span></div>' +
+        '<button type="button" class="btn btn-primary" data-qz="practise-all">✦ Practise ' + (wrong.length === 1 ? 'this mistake' : 'my ' + wrong.length + ' mistakes') + '</button></div>' : '') +
+      '<div class="qr-head-row"><h4>Go over your answers</h4><div class="seg" role="group" aria-label="Show">' +
+        '<button type="button" class="seg-btn' + (filter === 'wrong' ? ' on' : '') + '" data-qz="show-wrong"' + (wrong.length ? '' : ' disabled') + '>Wrong (' + wrong.length + ')</button>' +
+        '<button type="button" class="seg-btn' + (filter === 'all' ? ' on' : '') + '" data-qz="show-all">All (' + answered + ')</button></div></div>' +
+      '<div class="qr-list">' + (shown.length ? shown.map(function (i) { return reviewItemHTML(qz.questions[i], qz.answers[i], i, filter === 'wrong'); }).join('') : '<p class="muted">Nothing to show.</p>') + '</div>';
+    foot.innerHTML = (missed.length ? '<button type="button" class="btn spacer" data-qz="due">Add missed cards to today\'s review</button>' : '<span class="spacer"></span>') +
+      '<button type="button" class="btn" data-qz="again">New quiz</button><button type="button" class="btn btn-primary" data-close>Done</button>';
+  }
+  // One answered question, laid out for going over afterwards (also used by the mistakes log).
+  function reviewItemHTML(q, chosen, i, open) {
+    var letters = 'ABCDE', right = chosen === q.answer;
+    return '<details class="qr-item ' + (right ? 'is-right' : 'is-wrong') + '"' + (open ? ' open' : '') + '>' +
+      '<summary><span class="qr-mark">' + (right ? '✓' : '✗') + '</span><span class="qr-sum"><b>' + (i != null ? 'Q' + (i + 1) + ' · ' : '') + esc(topicLabel(q.topic)) + '</b>' +
+        '<span>' + (right ? 'You answered ' + letters[chosen] + ' — correct' : 'You chose ' + letters[chosen] + ' · best answer ' + letters[q.answer]) + '</span></span></summary>' +
+      '<div class="qr-body"><div class="quiz-stem">' + esc(q.stem) + '</div><p class="quiz-q">' + esc(q.question) + '</p>' +
+      '<ol class="qr-opts">' + q.options.map(function (o, k) {
+        var cls = k === q.answer ? 'right' : k === chosen ? 'chosen' : '';
+        return '<li class="' + cls + '"><span class="letter">' + letters[k] + '</span><span>' + esc(o) + '</span>' +
+          (k === q.answer ? '<em>Best answer</em>' : k === chosen ? '<em>Your answer</em>' : '') + '</li>';
+      }).join('') + '</ol>' +
+      '<div class="quiz-expl"><b>Why:</b> ' + esc(q.explanation) + '<div class="quiz-cards">' +
+        q.cards.map(function (id) { var c = byId(id); return c ? '<button type="button" class="tag" data-peek="' + esc(id) + '">' + esc(c.name) + '</button>' : ''; }).join('') + '</div></div>' +
+      (!right && i != null && q.mistakeId ? '<div class="qr-actions"><button type="button" class="btn btn-sm" data-qz="practise-one" data-i="' + i + '">✦ Practise similar questions</button></div>' : '') +
+      '</div></details>';
+  }
+  // Optional: only use cards that the chosen sources cover.
+  function quizSourcesHTML() {
+    var list = state.sources.filter(function (sr) { return qz.module === 'all' || !sr.module || sr.module === qz.module; });
+    if (!list.length) return '';
+    var valid = {}; list.forEach(function (sr) { valid[sr.id] = true; });
+    qz.sources = (qz.sources || []).filter(function (id) { return valid[id]; });
+    return '<details class="qz-srcbox"' + (qz.sources.length ? ' open' : '') + '><summary><span class="lbl">Limit to specific sources</span> <span class="muted" id="qzSrcCount">(' +
+      (qz.sources.length ? qz.sources.length + ' selected' : 'optional — none ticked = all your cards') + ')</span></summary>' +
+      '<p class="muted qz-src-note">Questions will only test cards that come from, or are discussed in, the sources you tick — and stay within what those sources say.</p>' +
+      '<div class="qz-topics">' + list.map(function (sr) {
+        return '<label class="qz-topic"><input type="checkbox" data-qsrc="' + esc(sr.id) + '"' + (qz.sources.indexOf(sr.id) !== -1 ? ' checked' : '') + '><span>' + esc(sr.title) + '</span><small>' +
+          esc(MODULE_LABEL[sr.module] || '') + '</small></label>';
+      }).join('') + '</div></details>';
   }
 
   /* ---- choosing what each question tests ---- */
   function quizPool() {
     var sel = {}; qz.topics.forEach(function (k) { sel[k] = true; });
-    return state.entries.filter(function (e) { return e.ratio && e.topic && (qz.module === 'all' || e.module === qz.module) && (!qz.topics.length || sel[topicKey(e)]); });
+    var pool = state.entries.filter(function (e) { return e.ratio && e.topic && (qz.module === 'all' || e.module === qz.module) && (!qz.topics.length || sel[topicKey(e)]); });
+    if (qz.sources && qz.sources.length && qz.srcNorm) {
+      var src = {}; qz.sources.forEach(function (id) { src[id] = true; });
+      pool = pool.filter(function (e) { return src[e.sourceId] || sourceMentions(e); });
+    }
+    return pool;
+  }
+  function normText(t) { return ' ' + String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+  // Ways a card's authority could be named in a source: the full name, and "Claimant v Defendant's first word".
+  function nameKeys(e) {
+    var n = e.name.replace(/\s*[\[(].*$/, ''), keys = [normText(n)];
+    var m = /^(.+?) v (\S+)/.exec(n); if (m) keys.push(normText(m[1] + ' v ' + m[2]));
+    var act = /^(.+? (?:Act|Regulations|Order) \d{4})/.exec(n); if (act) keys.push(normText(act[1]));
+    return keys.filter(function (k) { return k.length >= 10; });
+  }
+  function sourceMentions(e) {
+    if (e.type === 'principle') return false;
+    var keys = nameKeys(e);
+    return qz.sources.some(function (id) { var t = qz.srcNorm[id]; return t && keys.some(function (k) { return t.indexOf(k) !== -1; }); });
+  }
+  // The passage of a chosen source that a card comes from (or is discussed in), to keep questions within it.
+  function sourceExtract(e) {
+    if (!qz.srcText) return '';
+    var ids = qz.sources.slice().sort(function (a, b) { return (b === e.sourceId) - (a === e.sourceId); });
+    for (var k = 0; k < ids.length; k++) {
+      var t = qz.srcText[ids[k]]; if (!t) continue;
+      var low = t.toLowerCase(), at = -1;
+      if (ids[k] === e.sourceId && e.sourceQuote) at = low.indexOf(e.sourceQuote.toLowerCase().slice(0, 60));
+      if (at < 0) { var nm = e.name.replace(/\s*[\[(].*$/, '').toLowerCase(); at = low.indexOf(nm); if (at < 0) { var mm = /^(.+? v \S+)/.exec(nm); if (mm) at = low.indexOf(mm[1]); } }
+      if (at >= 0) return t.slice(Math.max(0, at - 350), at + 650).replace(/\f/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return '';
   }
   function cardPriority(e, hist) {
     var h = hist.cards[e.id], p = state.progress[e.id], now = Date.now();
@@ -168,7 +249,23 @@
     pool.forEach(function (e) { (byT[topicKey(e)] = byT[topicKey(e)] || []).push(e); });
     var topics = Object.keys(byT);
     var slots = [], lastT = null, typesLeft = shuffle(QZ_TYPES.slice()), settingsLeft = shuffle(QZ_SETTINGS.slice());
+    var targets = (qz.targets || []).map(mistakeById).filter(function (m) { return m && !m.resolved; });
     for (var i = 0; i < size; i++) {
+      if (!typesLeft.length) typesLeft = shuffle(QZ_TYPES.slice());
+      if (!settingsLeft.length) settingsLeft = shuffle(QZ_SETTINGS.slice());
+      // Practice: aim questions at the exact points you got wrong, rotating through them.
+      if (targets.length && (qz.practiceOnly || !topics.length || i % 2 === 0)) {
+        var m = targets[(qz.targetTurn = (qz.targetTurn || 0) + 1) % targets.length];
+        var mcards = m.cards.map(byId).filter(Boolean);
+        var mainT = mcards[0] || (byT[m.topic] || [])[0];
+        if (mainT) {
+          var sup = mcards.slice(1).concat((byT[m.topic] || state.entries.filter(function (x) { return topicKey(x) === m.topic && x.ratio; })).filter(function (c) { return mcards.indexOf(c) === -1; })).slice(0, 3);
+          var lvT = Math.max(1, Math.min(5, Math.round(Math.min(m.level, topicLevel(m.topic)) + (m.tries ? 0.5 : 0))));
+          slots.push({ topic: m.topic, main: mainT, support: sup.filter(function (c) { return c !== mainT; }).slice(0, 2), level: lvT, type: typesLeft.pop(), setting: settingsLeft.pop(), target: m });
+          continue;
+        }
+      }
+      if (!topics.length) break;
       // Weaker topics come up more often, but every chosen topic keeps appearing.
       var weights = topics.map(function (t) {
         var w = 6 - topicLevel(t) + 1.5 / (1 + (qz.topicCount[t] || 0));
@@ -186,8 +283,6 @@
       var support = cards.slice(1).filter(function (c) { return c.id !== main.id; }).slice(0, 2);
       var lv = qz.diff === 'adaptive' ? topicLevel(t) + (Math.random() - 0.5) : +qz.diff;
       lv = Math.max(1, Math.min(5, Math.round(lv)));
-      if (!typesLeft.length) typesLeft = shuffle(QZ_TYPES.slice());
-      if (!settingsLeft.length) settingsLeft = shuffle(QZ_SETTINGS.slice());
       slots.push({ topic: t, main: main, support: support, level: lv, type: typesLeft.pop(), setting: settingsLeft.pop() });
     }
     return slots;
@@ -202,7 +297,9 @@
       'Follow this plan exactly, one question per line, in this order:',
       slots.map(function (s, i) {
         return 'Q' + (i + 1) + ': mainly tests card [' + s.main.id + ']' + (s.support.length ? ' (you may also draw on ' + s.support.map(function (c) { return '[' + c.id + ']'; }).join(', ') + ', e.g. for plausible distractors)' : '') +
-          '. Difficulty ' + s.level + ' – ' + QZ_LEVELS[s.level].brief + ' Question style: ' + s.type + ' Setting, if it suits the law: ' + s.setting + '.';
+          '. Difficulty ' + s.level + ' – ' + QZ_LEVELS[s.level].brief + ' Question style: ' + s.type + ' Setting, if it suits the law: ' + s.setting + '.' +
+          (s.target ? ' PRACTICE ON AN EARLIER MISTAKE: the student previously answered "' + s.target.question + '" on this point and chose "' + s.target.options[s.target.chosen] +
+            '" instead of the best answer "' + s.target.options[s.target.answer] + '". Write a NEW question on the same rule with different facts and a different angle, so that a student who still holds that misunderstanding would pick a wrong option (include an option reflecting that misunderstanding), while one who now understands the point gets it right.' : '');
       }).join('\n'),
       '',
       'Rules for every question:',
@@ -214,10 +311,12 @@
       '- Before replying, check each question: could a student who does not know the law pick the answer from length, detail, tone or wording alone? If so, rewrite the options.',
       '- explanation (up to 110 words): why the best answer is right and why the most tempting wrong option is wrong, naming the card(s) relied on. UK spelling.',
       '- cards: the ids of the cards each question relies on.',
+      qz.srcText ? '- STAY WITHIN THE CHOSEN SOURCES: test only points that are on the card and supported by its SOURCE EXTRACT below (where one is given). Do not test anything those sources do not cover.' : '',
       'Reply with ONLY a JSON array: [{"stem": string, "question": string, "options": [5 strings], "answer": index 0-4, "explanation": string, "cards": [id strings]}]',
       '',
       'CARDS:',
-      Object.keys(cards).map(function (id) { return '[' + id + ']\n' + entryNotes(cards[id]); }).join('\n\n')
+      Object.keys(cards).map(function (id) { return '[' + id + ']\n' + entryNotes(cards[id]); }).join('\n\n'),
+      qz.srcText ? '\nSOURCE EXTRACTS (from the sources the student chose):\n' + slots.map(function (sl) { var x = sourceExtract(sl.main); return x ? '[' + sl.main.id + '] "' + x + '"' : ''; }).filter(Boolean).join('\n\n') : ''
     ].join('\n');
   }
   // True if the right answer could be spotted from how the options look.
@@ -251,7 +350,7 @@
       options: q.options.map(function (o) { return cleanString(o, 400).trim(); }), answer: ans,
       explanation: cleanString(q.explanation, 1500),
       cards: (Array.isArray(q.cards) ? q.cards : []).map(String).filter(function (id) { return byId(id); }),
-      topic: slot.topic, level: slot.level
+      topic: slot.topic, level: slot.level, target: slot.target ? slot.target.id : null
     };
     if (!out.stem || !out.question || out.options.some(function (o) { return !o; })) return null;
     if (!out.cards.length) out.cards = [slot.main.id];
@@ -318,14 +417,43 @@
   function startQuiz() {
     qz.module = $('#qzModule').value; qz.focus = $('#qzFocus').value; qz.n = +$('#qzN').value;
     qz.diff = $('#qzDiff').value === 'adaptive' ? 'adaptive' : +$('#qzDiff').value;
+    qz.mode = 'quiz'; qz.targets = null; qz.practiceOnly = false; qz.error = '';
+    qz.srcText = null; qz.srcNorm = null;
+    if (!qz.sources || !qz.sources.length) return beginQuiz();
+    $('#quizBody').innerHTML = '<p style="margin:20px 0"><span class="spinner"></span>Reading your chosen sources…</p>';
+    var mine = qz;
+    Promise.all(qz.sources.map(function (id) { return loadSourceText(id).then(function (t) { return [id, t]; }, function () { return [id, '']; }); })).then(function (pairs) {
+      if (qz !== mine) return;
+      qz.srcText = {}; qz.srcNorm = {};
+      pairs.forEach(function (p) { qz.srcText[p[0]] = p[1] || ''; qz.srcNorm[p[0]] = normText(p[1]); });
+      beginQuiz();
+    });
+  }
+  function beginQuiz() {
     var pool = quizPool();
-    qz.error = '';
-    if (pool.length < 3) { qz.error = 'There aren\'t enough cards with rules in this selection. Tick more topics.'; renderQuiz(); return; }
-    qz.total = qz.n; qz.questions = []; qz.answers = []; qz.idx = 0; qz.score = 0; qz.dropped = 0; qz.used = {}; qz.topicCount = {}; qz.finished = false;
+    if (pool.length < 3 && !(qz.targets && qz.targets.length)) {
+      qz.error = qz.sources && qz.sources.length ? 'Too few of your cards come from those sources (with these topics). Tick more sources or clear the topic choice.' : 'There aren\'t enough cards with rules in this selection. Tick more topics.';
+      qz.step = 'setup'; renderQuiz(); return;
+    }
+    qz.total = qz.n; qz.questions = []; qz.answers = []; qz.idx = 0; qz.score = 0; qz.dropped = 0; qz.used = {}; qz.topicCount = {}; qz.finished = false; qz.logged = false; qz.reviewFilter = null;
     qz.step = 'writing';
-    $('#quizBody').innerHTML = '<p style="margin:20px 0"><span class="spinner"></span>Writing your first ' + Math.min(QZ_BATCH, qz.total) + ' questions from ' + cardsWord(pool.length) + '… the rest are written while you answer.</p>';
+    $('#quizBody').innerHTML = '<p style="margin:20px 0"><span class="spinner"></span>' + (qz.mode === 'practice' ? 'Writing fresh questions on the points you got wrong…' :
+      'Writing your first ' + Math.min(QZ_BATCH, qz.total) + ' questions from ' + cardsWord(pool.length) + '… the rest are written while you answer.') + '</p>';
     $('#quizFoot').innerHTML = '<button type="button" class="btn" data-qz="cancel">Cancel</button>';
     requestBatch();
+  }
+  // Practice aimed at particular mistakes (and, if given, a topic around them).
+  function startPractice(mistakeIds, opts) {
+    opts = opts || {};
+    var ids = (mistakeIds || []).filter(function (id) { var m = mistakeById(id); return m && !m.resolved; });
+    if (!claudeCaps.sample) { toast('Practice questions are written by Claude, which works when the app is opened in claude.ai.', { type: 'error' }); return; }
+    var prev = qz || {};
+    qz = { step: 'setup', module: 'all', topics: opts.topics || [], sources: [], focus: 'weak', diff: 'adaptive', mode: 'practice',
+      targets: ids, practiceOnly: !(opts.topics && opts.topics.length), n: opts.n || Math.max(5, Math.min(20, ids.length * 2)) };
+    qz.prevSetup = { module: prev.module, topics: prev.topics, sources: prev.sources, focus: prev.focus, n: prev.n, diff: prev.diff };
+    if (!ids.length && !(opts.topics && opts.topics.length)) { toast('Nothing to practise there.'); return; }
+    if ($('#quizModal').hidden) openModal($('#quizModal'));
+    beginQuiz();
   }
   function recordAnswer(q, right) {
     var key = q.topic, s = state.prefs.qstats[key] || { lv: topicLevel(key), n: 0, r: 0 };
@@ -343,7 +471,7 @@
     hist.stems.push(q.stem.split(/\s+/).slice(0, 18).join(' '));
     saveQzHistory(hist);
   }
-  function quizAction(a) {
+  function quizAction(a, arg) {
     if (a === 'go') startQuiz();
     else if (a === 'cancel') { if (qz.ctl) qz.ctl.abort(); qz.step = 'setup'; qz.writing = false; renderQuiz(); }
     else if (a === 'all-topics') { qz.topics = quizTopicList(qz.module).map(function (t) { return t.key; }); renderQuiz(); }
@@ -353,7 +481,19 @@
       else { qz.step = 'done'; qz.finished = true; renderQuiz(); }
     } else if (a === 'retry') { qz.batchError = ''; renderQuiz(); requestBatch(); }
     else if (a === 'finish') { if (qz.ctl) qz.ctl.abort(); qz.writing = false; qz.step = 'done'; qz.finished = true; renderQuiz(); }
-    else if (a === 'again') { qz = { step: 'setup', module: qz.module, topics: qz.topics, focus: qz.focus, n: qz.n, diff: qz.diff }; renderQuiz(); }
+    else if (a === 'again') {
+      var ps = qz.mode === 'practice' && qz.prevSetup ? qz.prevSetup : qz;
+      qz = { step: 'setup', module: ps.module || state.filter, topics: ps.topics || [], sources: ps.sources || [], focus: ps.focus || 'mixed', n: ps.n || 10, diff: ps.diff || 'adaptive' };
+      renderQuiz();
+    }
+    else if (a === 'show-wrong' || a === 'show-all') { qz.reviewFilter = a === 'show-wrong' ? 'wrong' : 'all'; renderQuiz(); }
+    else if (a === 'practise-all') {
+      startPractice(qz.questions.filter(function (q, i) { return qz.answers[i] != null && qz.answers[i] !== q.answer && q.mistakeId; }).map(function (q) { return q.mistakeId; }));
+    }
+    else if (a === 'practise-one') {
+      var q1 = qz.questions[+arg];
+      if (q1 && q1.mistakeId) startPractice([q1.mistakeId], { n: 5 });
+    }
     else if (a === 'due') {
       var now = Date.now(), n = 0;
       (qz.missed || []).forEach(function (id) { var p = state.progress[id]; if (p && p.due > now) { p.due = now; n++; } });
@@ -367,6 +507,12 @@
     else if (t.id === 'qzN') qz.n = +t.value;
     else if (t.id === 'qzFocus') qz.focus = t.value;
     else if (t.id === 'qzDiff') qz.diff = t.value === 'adaptive' ? 'adaptive' : +t.value;
+    else if (t.matches('[data-qsrc]')) {
+      var sid = t.getAttribute('data-qsrc');
+      qz.sources = (qz.sources || []).filter(function (x) { return x !== sid; });
+      if (t.checked) qz.sources.push(sid);
+      var c = $('#qzSrcCount'); if (c) c.textContent = '(' + (qz.sources.length ? qz.sources.length + ' selected' : 'optional — none ticked = all your cards') + ')';
+    }
     else if (t.matches('[data-topic]')) {
       var k = t.getAttribute('data-topic');
       qz.topics = qz.topics.filter(function (x) { return x !== k; });
@@ -381,6 +527,7 @@
     var right = i === q.answer;
     if (right) qz.score++;
     recordAnswer(q, right);
+    memoryQuizAnswer(q, i, right);
     renderQuiz();
   }
 

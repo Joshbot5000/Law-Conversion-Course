@@ -14,6 +14,8 @@
     prefs: { newPerDay: 15, exams: {}, autoPace: false, notDup: [], qstats: {} }, // synced study settings
     sources: [],                     // source metadata (texts load on demand)
     notes: [],                       // lecture notes
+    perf: { c: {}, s: [] },          // study memory: results per card and recent sessions
+    mistakes: [],                    // quiz questions answered wrongly, until mastered
     commentFor: null,
     settings: {
       view: 'card', cram: false, sort: 'module', typeFilter: 'all', statusFilter: 'all',
