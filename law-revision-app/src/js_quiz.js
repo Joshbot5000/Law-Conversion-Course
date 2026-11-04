@@ -159,8 +159,9 @@
   function startClock() {
     clearInterval(qzClock);
     qzClock = setInterval(function () {
-      if (!qz || !qz.timed || qz.step !== 'play') { clearInterval(qzClock); return; }
-      if ($('#quizModal').hidden || qz.idx >= qz.questions.length) return;
+      // Stop for good only once the exam is over; while the first questions are being written it just waits.
+      if (!qz || !qz.timed || qz.step === 'done' || qz.step === 'setup') { clearInterval(qzClock); return; }
+      if (qz.step !== 'play' || $('#quizModal').hidden || qz.idx >= qz.questions.length) return;
       qz.timeLeft--;
       var c = $('#qzClock');
       if (c) { c.textContent = '⏱ ' + fmtClock(qz.timeLeft); c.classList.toggle('low', qz.timeLeft <= 60); }

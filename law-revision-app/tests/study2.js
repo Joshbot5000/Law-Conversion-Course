@@ -48,6 +48,22 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(s.mistakes.length === 1, 'the wrong answer went into the mistakes log after submitting (skipped ones don\'t)');
   await page.keyboard.press('Escape');
 
+  // 1a. Like real use: Claude takes a few seconds to write the first questions. The clock must still run afterwards.
+  await page.evaluate(() => { window.__sampleDelay = 80; });
+  await page.click('#quizBtn'); await page.click('[data-qz="again"]').catch(() => {});
+  await page.waitForSelector('#qzTimed');
+  await page.selectOption('#qzModule', 'contract'); await page.selectOption('#qzN', '10'); await page.selectOption('#qzTimed', 'timed');
+  const t0 = Date.now();
+  await page.click('[data-qz="go"]'); await page.waitForSelector('#qzClock', { timeout: 30000 });
+  const wrote = Date.now() - t0;
+  const k1 = await page.textContent('#qzClock');
+  await page.waitForTimeout(3200);
+  const k2 = await page.textContent('#qzClock');
+  ok(wrote > 1500 && /17:00|16:59/.test(k1) && k2 !== k1 && /16:5\d/.test(k2), 'with slow question writing (' + Math.round(wrote / 100) / 10 + ' s), the clock starts full and then counts down: ' + k1 + ' → ' + k2);
+  await page.click('[data-qz="submit"]'); await page.click('#dialogButtons >> text=Submit').catch(() => {});
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { window.__sampleDelay = 2; });
+
   // 1b. Time running out submits automatically
   const p2 = await ctx.newPage(); await p2.clock.install();
   await p2.goto('file://' + path.join(T, 'online_wrapped.html'));
