@@ -6,23 +6,35 @@
      ------------------------------------------------------------------ */
   var qz = null;
   var QZ_BATCH = 5;
+  // Every level is written in the law-school / SQE1 single-best-answer style (see SBA_STYLE below);
+  // the levels differ in how many issues interact and how close the distractors are.
   var QZ_LEVELS = {
-    1: { name: 'Foundation', brief: 'Foundation: straightforward facts that clearly trigger one rule from the card; tests whether the student knows and can recognise the rule. Distractors are rules from neighbouring areas or common misconceptions.' },
-    2: { name: 'Developing', brief: 'Developing: apply one rule to clear facts and reach the right conclusion; one distractor should be the right rule reaching the wrong conclusion.' },
-    3: { name: 'Standard', brief: 'Standard (SQE1 level): the facts include an irrelevant or misleading detail, and the student must choose between closely related rules or outcomes. Every distractor is a plausible conclusion a weaker student would reach.' },
-    4: { name: 'Hard', brief: 'Hard: two rules, or a rule and its exception, interact; the decisive point turns on a subtle fact in the scenario. Distractors include correct statements of law that do not apply on these facts, and the right outcome for the wrong reason.' },
-    5: { name: 'Expert', brief: 'Expert: multi-step reasoning (eg rule → exception → limit on the exception); every option is partly right and only careful analysis of one decisive fact identifies the best answer. Distractors reflect the mistakes a strong student makes under time pressure.' }
+    1: { name: 'Foundation', brief: 'Foundation: one clear issue on the facts. The best answer states the rule and applies it; distractors are neighbouring doctrines a weaker student confuses it with (e.g. fraud for theft, consent for contributory negligence).' },
+    2: { name: 'Developing', brief: 'Developing: one issue, but the student must apply the rule to the facts to reach the outcome; include the right conclusion for the wrong reason, and a true statement of law that does not answer the question.' },
+    3: { name: 'Standard', brief: 'Standard (law-school / SQE1 level): the facts include a detail that decides the outcome and at least one that is irrelevant or misleading; the options are reasoned "Yes, because… / No, because…" style statements, two of which share the same conclusion and differ only in the legal reason; one distractor is true but incomplete, and the best answer is the most complete and precise.' },
+    4: { name: 'Hard', brief: 'Hard: two rules, or a rule and its exception or limit, interact (or two parties with different positions); the decisive point turns on one subtle fact. Several options begin with identical wording and differ in one clause; distractors include correct law that does not apply on these facts and the right outcome for the wrong reason.' },
+    5: { name: 'Expert', brief: 'Expert: multi-step reasoning (rule → exception → limit, or several items or parties each failing for a different reason); every option is partly right and only careful analysis of the decisive fact identifies the best answer. Distractors are the mistakes a strong student makes under time pressure.' }
   };
+  // Question shapes seen in law-school and SQE1 papers; rotated so every batch varies.
   var QZ_TYPES = [
-    'What is the most likely outcome?',
-    'What is the best advice to give one of the parties?',
-    'Which statement best explains WHY the outcome is as it is (the correct legal reasoning)?',
-    'Which additional fact, if proved, would most strengthen or change one party\'s position?',
-    'What is one party\'s strongest argument?',
-    'Which statement most accurately describes one party\'s legal position?',
-    'A trainee has reached a conclusion on these facts (state it in the stem); which option best identifies whether, and why, the trainee is right or wrong?',
-    'Which remedy or consequence is the party most likely to obtain or face?'
+    'Reasoned outcome: "Which of the following statements best explains whether [party] will succeed / be liable / be able to rely on [defence]?" — options start "Yes, because…" or "No, because…" (at least two of each), each giving a different legal reason.',
+    'Correct statement: "Which one of the following statements is correct in relation to [party]\'s liability / position?" — five full statements of the legal position, only one accurate on these facts.',
+    'Several items: the scenario describes several items, acts or events (four or five); the question asks which ONE satisfies a legal requirement (e.g. which item has the actus reus been satisfied for) — each option names one item, and each wrong item fails for a DIFFERENT legal reason.',
+    'Two parties: the scenario involves two potential claimants (or defendants) with different positions; options say who succeeds and why (e.g. "Only the first… because…", "Neither… because…", "Both… because…"), with near-identical openings differing in the reason.',
+    'Concept answer: "Which [measure of damages / remedy / defence / type of term / ground] is a court most likely to award / find?" — options are short legal terms or concepts of similar length (2-6 words each).',
+    'Calculation: "What damages / sum can the client recover?" — options are different figures, each with a short reason reflecting a different (mis)application of the rule. Use ONLY if the card\'s rule genuinely involves working out a sum; otherwise use the reasoned-outcome shape.',
+    'Advice: "You have been asked to advise [client]. Which of the following best describes the legal position?" — options are statements of the position, including one absolute statement ("never", "always", "any") that overstates the law.',
+    'Does it satisfy / breach the rule: "Does [conduct] breach / satisfy [the doctrine or rule]?" — options "Yes, because…" / "No, because…", with one correct reason; for constitutional or statutory points the scenario may describe a fictitious Act, saying it is fictitious.'
   ];
+  // How law-school / SQE1 single-best-answer questions read (the owner's examples, described in our own words).
+  var SBA_STYLE = [
+    'STYLE — write like a law-school / SQE1 paper:',
+    '- Describe people by role, not by name: "a client", "a solicitor", "a builder", "the claimant", "a student", "the deceased\'s daughter". Use professional framing in about half the questions ("A solicitor acts for…", "A solicitor has been instructed by…", "You have been asked to advise…"); otherwise a plain factual scenario.',
+    '- Scenarios of 70-160 words with concrete, realistic detail (ages, sums, dates, what each person knew or intended), including the one fact that decides the answer and at least one detail that is irrelevant or a red herring.',
+    '- Options are complete legal statements with a reason, not bare conclusions (except for the concept-answer shape). Two or three options share the same opening words and differ only in the legal reason, so the student must judge WHY, not just WHETHER.',
+    '- Include, across the five options: the right conclusion for the wrong reason; a true statement of law that is incomplete or does not answer the question (the best answer is the most complete and precise one); a neighbouring doctrine confused with the right one (e.g. remoteness instead of duty, consent instead of contributory negligence, fraud instead of theft); and the wrong party or wrong element.',
+    '- Do not let absolute words ("never", "always", "any") appear only in wrong options; if one wrong option is absolute, word the others so that wording alone gives nothing away.'
+  ].join('\n');
   var QZ_SETTINGS = ['a small family business', 'an online sale', 'a construction project', 'a sports club', 'a technology start-up', 'farming', 'a charity', 'a landlord and tenant', 'an art dealer', 'a car sale between private individuals', 'a catering company', 'a music festival', 'a university student', 'a shipping or logistics firm', 'a care home', 'a wedding supplier', 'a local council', 'a bakery chain', 'a vintage clothes shop', 'a removals company'];
   var QZ_HIST_KEY = 'lawRevisionApp.quizHistory';
 
@@ -56,10 +68,10 @@
     if (s) return s.lv;
     var cards = state.entries.filter(function (e) { return topicKey(e) === key; });
     var seen = cards.filter(function (e) { return state.progress[e.id]; });
-    if (!seen.length) return 2;
+    if (!seen.length) return 3;
     var lapses = 0, strong = 0;
     seen.forEach(function (e) { var p = state.progress[e.id]; lapses += p.lapses; if (p.ivl >= 21) strong++; });
-    var lv = 2.5 - Math.min(1, lapses / seen.length) + 1.5 * strong / seen.length;
+    var lv = 3 - Math.min(1, lapses / seen.length) + 1.5 * strong / seen.length;
     return Math.max(1, Math.min(5, lv));
   }
   function levelName(lv) { return QZ_LEVELS[Math.max(1, Math.min(5, Math.round(lv)))].name; }
@@ -360,12 +372,14 @@
       '',
       'Rules for every question:',
       '- Use ONLY the law stated on the cards. Do not introduce other cases, statutes or rules, and never invent citations. You may name an authority only if it appears on the cards.',
-      '- A fresh fictional scenario (50-110 words) with new names, then a one-sentence question. Vary names, settings and structure; never reuse or closely imitate these recent scenarios:',
+      SBA_STYLE,
+      '',
+      '- A fresh fictional scenario for every question, then a one-sentence question in the shape given in the plan. Vary roles, settings and structure; never reuse or closely imitate these recent scenarios:',
       avoid.length ? avoid.map(function (a) { return '  · ' + a; }).join('\n') : '  · (none yet)',
       '- Exactly 5 options, and exactly one is the best answer according to the cards. The other four must be genuinely tempting: the right rule wrongly applied, the right outcome for the wrong reason, a neighbouring rule that does not apply, an exception whose conditions are not met, or a common misconception.',
       '- THE RIGHT ANSWER MUST NOT STAND OUT. All five options must be about the same length (within a few words of each other), use the same grammatical structure, give the same level of detail and the same kind of brief reason, and use similar hedging ("likely", "unless", etc.). Do not make the right answer the longest, the most qualified, the most precise, or the only one that repeats words from the scenario. No "all/none of the above", no absurd options, no options that are obviously the odd one out.',
       '- Before replying, check each question: could a student who does not know the law pick the answer from length, detail, tone or wording alone? If so, rewrite the options.',
-      '- explanation (up to 110 words): why the best answer is right and why the most tempting wrong option is wrong, naming the card(s) relied on. UK spelling.',
+      '- explanation (up to 130 words): why the best answer is right and, briefly, why each of the two most tempting wrong options is wrong (name the trap, e.g. "right outcome, wrong reason"), naming the card(s) relied on. UK spelling.',
       '- cards: the ids of the cards each question relies on.',
       qz.srcText ? '- STAY WITHIN THE CHOSEN SOURCES: test only points that are on the card and supported by its SOURCE EXTRACT below (where one is given). Do not test anything those sources do not cover.' : '',
       'Reply with ONLY a JSON array: [{"stem": string, "question": string, "options": [5 strings], "answer": index 0-4, "explanation": string, "cards": [id strings]}]',

@@ -115,7 +115,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('[data-pgtab="activity"]');
   ok((await page.$$('#progressBody .pg-sess-row')).length === 4, 'activity lists the 4 sessions with answers (quizzes ended before answering are not logged)');
   await page.click('[data-pgtab="suggest"]');
-  await page.locator('#progressBody [data-pg="sg-practise"]').first().click();
+  await page.locator('#progressBody .sg-item', { hasText: 'quiz mistake' }).first().locator('[data-pg="sg-practise"]').click();
   await page.waitForSelector('#quizModal:not([hidden]) .quiz-opt', { timeout: 15000 });
   const tp = (await prompts()).slice(-1)[0];
   ok(/PRACTICE ON AN EARLIER MISTAKE/.test(tp), 'Practise on a suggestion starts questions aimed at that topic\'s mistakes');

@@ -67,6 +67,11 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   const styles = new Set(calls.join('\n').match(/Question style: [^?]+\?/g));
   ok(styles.size >= 6, styles.size + ' different question styles used');
   ok(calls.every(c => c.includes('MUST NOT STAND OUT')), 'every prompt carries the option-parity rules');
+  ok(calls.every(c => c.includes('Describe people by role, not by name') && c.includes('the right conclusion for the wrong reason') && /true statement of law that is incomplete/.test(c)), 'every prompt carries the law-school SBA style rules');
+  const shapes = new Set(calls.join('\n').match(/Question style: (Reasoned outcome|Correct statement|Several items|Two parties|Concept answer|Calculation|Advice|Does it satisfy)/g));
+  ok(shapes.size >= 6, shapes.size + ' of the 8 law-school question shapes used across 20 questions');
+  const firstLv = calls[0].match(/Difficulty (\d)/g).map(x => +x.slice(-1));
+  ok(firstLv.every(l => l >= 2 && l <= 4) && firstLv.filter(l => l >= 3).length >= 3, 'new topics start around Standard (law-school) level: ' + firstLv);
   const reps = await page.evaluate(() => window.__mock.repairs || 0);
   ok(reps > 0 && giveawaysShown === 0, 'give-away options were rewritten (' + reps + ' repair calls) and none reached you');
 
