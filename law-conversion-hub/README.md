@@ -13,6 +13,8 @@ My revision system for the PGDL at the University of Law: interactive chapter po
 | [`notes/`](notes/) | Chapter notes in Markdown: term, plain-English explanation, cases, worked example |
 | [`templates/`](templates/) | Chapter, case-note and problem-question templates |
 | [`career/`](career/) | Commercial-awareness explainers |
+| [`watson-glaser/`](watson-glaser/) | Watson Glaser practice trainer (installable app) |
+| [`interview-trainer/`](interview-trainer/) | AI law firm interview trainer: video, voice, unpredictable follow-ups and marking (installable app) |
 | `index.html` | The revision hub website |
 
 ## How a claim in negligence works
