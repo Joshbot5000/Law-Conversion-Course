@@ -27,7 +27,8 @@
       sources: Array.isArray(m.sources) ? m.sources.slice(0, 20).map(function (s) { return { id: cleanString(s && s.id, 120), title: cleanString(s && s.title, 200) }; }) : [],
       createdAt: m.createdAt && !isNaN(new Date(m.createdAt).getTime()) ? m.createdAt : nowISO(),
       parts: Math.max(1, Math.min(20, Math.round(num(m.parts, 1)))),
-      counts: m.counts && typeof m.counts === 'object' ? { principles: num(m.counts.principles, 0), terms: num(m.counts.terms, 0), cases: num(m.counts.cases, 0) } : { principles: 0, terms: 0, cases: 0 }
+      kind: m.kind === 'poster' ? 'poster' : 'notes',
+      counts: m.counts && typeof m.counts === 'object' ? { principles: num(m.counts.principles, 0), terms: num(m.counts.terms, 0), cases: num(m.counts.cases, 0), pages: num(m.counts.pages, 0), points: num(m.counts.points, 0), check: num(m.counts.check, 0) } : { principles: 0, terms: 0, cases: 0, pages: 0, points: 0, check: 0 }
     };
   }
   function readLocalRn() {
@@ -48,8 +49,10 @@
   function saveRnDoc(doc) {
     var json = JSON.stringify(doc), parts = [];
     for (var i = 0; i < json.length; i += RN_PART) parts.push(json.slice(i, i + RN_PART));
-    var meta = sanitizeRnMeta({ id: doc.id, title: doc.title, module: doc.module, sources: doc.sources, createdAt: doc.createdAt, parts: parts.length,
-      counts: { principles: doc.sections.reduce(function (n, s) { return n + s.entries.length; }, 0), terms: doc.terms.length, cases: doc.cases.length } });
+    var counts;
+    if (doc.kind === 'poster') { var st = psStats(doc); counts = { pages: doc.pages.length, points: st.found, check: st.flag + st.notFound }; }
+    else counts = { principles: doc.sections.reduce(function (n, s) { return n + s.entries.length; }, 0), terms: doc.terms.length, cases: doc.cases.length };
+    var meta = sanitizeRnMeta({ id: doc.id, title: doc.title, module: doc.module, sources: doc.sources, createdAt: doc.createdAt, parts: parts.length, kind: doc.kind, counts: counts });
     rnBodies[doc.id] = doc;
     if (store.mode === 'cloud' && claudeCaps.db) {
       var db = claudeCaps.db;
@@ -81,7 +84,7 @@
   function deleteRnDoc(id) {
     var meta = state.rdocs.filter(function (m) { return m.id === id; })[0];
     state.rdocs = state.rdocs.filter(function (m) { return m.id !== id; });
-    delete rnBodies[id];
+    delete rnBodies[id]; delete psBlobs[id];
     if (store.mode === 'cloud' && claudeCaps.db) {
       var ops = [claudeCaps.db.collection('rdoc').doc(id).delete()];
       for (var n = 0; n < (meta ? meta.parts : 1); n++) ops.push(claudeCaps.db.collection('rdocpart').doc(id + '_' + n).delete());
@@ -92,7 +95,7 @@
     try { kvSet(RN_KEY, JSON.stringify(d)); } catch (e) { /* ignore */ }
     return Promise.resolve();
   }
-  function renderRnCount() { var c = $('#rnCount'); if (c) c.textContent = String(state.rdocs.length); }
+  function renderRnCount() { var c = $('#rnCount'); if (c) c.textContent = String(state.rdocs.filter(function (m) { return m.kind === 'poster'; }).length); }
   // For backups: every document in full.
   function rnForExport() {
     return Promise.all(state.rdocs.map(function (m) { return loadRnDoc(m.id).then(null, function () { return null; }); })).then(function (l) { return l.filter(Boolean); });
@@ -100,8 +103,8 @@
   function importRnDocs(list) {
     if (!Array.isArray(list)) return Promise.resolve(0);
     var have = {}; state.rdocs.forEach(function (m) { have[m.id] = true; });
-    var todo = list.filter(function (d) { return d && typeof d.id === 'string' && !have[d.id] && Array.isArray(d.sections); });
-    return todo.reduce(function (p, d) { return p.then(function () { return saveRnDoc(cleanRnDoc(d)); }); }, Promise.resolve()).then(function () { return todo.length; });
+    var todo = list.filter(function (d) { return d && typeof d.id === 'string' && !have[d.id] && (Array.isArray(d.sections) || (d.kind === 'poster' && Array.isArray(d.pages))); });
+    return todo.reduce(function (p, d) { return p.then(function () { return saveRnDoc(d.kind === 'poster' ? cleanPoster(d) : cleanRnDoc(d)); }); }, Promise.resolve()).then(function () { return todo.length; });
   }
 
   /* ---- the sources, page by page ---- */
@@ -150,92 +153,6 @@
     return out.length ? out.map(function (i) { return all[i]; }) : all.slice(0, 1);
   }
 
-  /* ---- prompts ---- */
-  var RN_RULES = [
-    'You are writing revision notes for a law conversion (PGDL) student, in the exact format they call "The Standard". They find long textbook prose overwhelming: compress the reading into the principles and authorities they need, explained so simply they never need to ask what something means.',
-    'RULES:',
-    '- Use ONLY the source pages below. Never invent a case, citation, year, court or section number. Copy citations exactly as the source gives them; if the source gives none, leave the citation empty.',
-    '- If something essential is missing from the source, you may add it only if you are certain, and set "added": true on it. If you are unsure of a detail, set "unverified": true rather than guess.',
-    '- Explain every legal term the moment it appears, fully (no shortcuts). Every case gets its story and its rule. Every principle gets its authority.',
-    '- UK spelling. Plain, warm, precise English. No markdown, no headings inside the text, no emojis.'
-  ].join('\n');
-  function planPrompt(chunk, srcTitles, part, of) {
-    return [
-      'REVISION NOTES — PLAN' + (of > 1 ? ' (part ' + part + ' of ' + of + ' of the reading)' : ''),
-      RN_RULES, '',
-      'Read the source pages and plan the notes. Sweep EVERYTHING, including footnotes and cases mentioned only in passing.',
-      'Reply with ONLY JSON:',
-      '{"title": "short title for these notes", "topicMap": ["3-6 short lines showing how the topic fits together, e.g. \\"Formation → Offer → Acceptance → Consideration\\""],',
-      ' "outcomes": ["each learning outcome, word for word, ONLY if the pages list learning outcomes; otherwise empty"],',
-      ' "sections": [{"title": "sub-topic", "pages": ["page refs like S1:4 that cover it"], "principles": ["a short label for EVERY principle or rule to cover in this sub-topic, in order"]}],',
-      ' "hooks": [{"title": "one of the 3 most complex multi-part tests or sequences", "pages": ["S1:5"]}],',
-      ' "terms": [{"term": "EVERY legal term, Latin maxim or jargon word used", "page": "S1:2"}],',
-      ' "cases": [{"name": "EVERY case named anywhere, as the source names it", "page": "S1:6"}]}',
-      'Use the page refs exactly as they appear in the page markers (for example S1:4 means source 1, page 4). Aim for 3-10 sub-topics of 2-8 principles each.',
-      '', 'SOURCES: ' + srcTitles, '', pagesText(chunk)
-    ].join('\n');
-  }
-  function sectionPrompt(sec, pages) {
-    return [
-      'REVISION NOTES — SECTION: ' + sec.title,
-      RN_RULES, '',
-      'Write the "Key principles with authorities" entries for this sub-topic. Cover every one of these, in order: ' + sec.principles.map(function (p, i) { return (i + 1) + '. ' + p; }).join('; ') + '. Add any principle on these pages that the list missed.',
-      'For each principle:',
-      '- principle: the rule in ONE sentence.',
-      '- authority: the case or statute section that establishes it, exactly as the source gives it.',
-      '- eli5: a plain explanation with an everyday analogy (2-4 sentences).',
-      '- case: if a case establishes or illustrates it, {"name", "citation", "facts": what actually happened in 2-3 plain sentences, "decision": what the court decided, "ratio": the rule it established, "exam": why it matters in the exam}; otherwise null.',
-      '- examAngle: where useful, how it shows up in an SBAQ or problem question (the typical fact pattern and the typical trap); otherwise "".',
-      '- pros / cons: only where the source discusses arguments for and against (a rule, a reform); otherwise empty arrays.',
-      'Reply with ONLY JSON: {"entries": [{"principle": "", "authority": "", "eli5": "", "case": null, "examAngle": "", "pros": [], "cons": [], "added": false, "unverified": false}]}',
-      '', pagesText(pages)
-    ].join('\n');
-  }
-  function hooksPrompt(hooks, pages) {
-    return [
-      'REVISION NOTES — MEMORY HOOKS', RN_RULES, '',
-      'For each of these complex multi-part tests or sequences, give a memory hook: a mnemonic or a vivid visual story that makes the parts stick, plus the parts in order (each with its authority where the source gives one).',
-      hooks.map(function (h, i) { return (i + 1) + '. ' + h.title; }).join('\n'),
-      'Reply with ONLY JSON: {"hooks": [{"title": "", "hook": "the mnemonic or story", "steps": ["each part of the test, in order"]}]}',
-      '', pagesText(pages)
-    ].join('\n');
-  }
-  function glossaryPrompt(terms, pages) {
-    return [
-      'REVISION NOTES — PLAIN ENGLISH GLOSSARY', RN_RULES, '',
-      'Explain each of these terms as it is used in the source: an ELI5 explanation with an everyday analogy, and its legal significance.',
-      terms.join('; '),
-      'Reply with ONLY JSON: {"terms": [{"term": "", "eli5": "", "significance": ""}]}',
-      '', pagesText(pages)
-    ].join('\n');
-  }
-  function casesPrompt(cases, pages) {
-    return [
-      'REVISION NOTES — CASE GLOSSARY', RN_RULES, '',
-      'For each of these cases (all named in the source), give: its name and citation as the source gives them, what happened (1-2 plain sentences), the ratio or effect, and which principle it supports. If the source only mentions a case in passing, say only what the source says and set "unverified": true for anything you are not certain of.',
-      cases.join('; '),
-      'Reply with ONLY JSON: {"cases": [{"name": "", "citation": "", "facts": "", "ratio": "", "supports": "", "unverified": false}]}',
-      '', pagesText(pages)
-    ].join('\n');
-  }
-  function outcomesPrompt(outcomes, sections) {
-    return [
-      'REVISION NOTES — LEARNING OUTCOMES CHECK',
-      'Map each learning outcome to the numbered sections of the notes that achieve it, with a one-line note. If an outcome is not fully covered, say what is missing.',
-      'OUTCOMES:', outcomes.map(function (o, i) { return (i + 1) + '. ' + o; }).join('\n'),
-      'SECTIONS:', sections.map(function (s, i) { return (i + 1) + '. ' + s.title + ' — ' + s.entries.map(function (e) { return e.principle; }).join(' | ').slice(0, 600); }).join('\n'),
-      'Reply with ONLY JSON: {"outcomes": [{"outcome": "", "sections": [section numbers], "note": "", "covered": true}]}'
-    ].join('\n');
-  }
-  function mergePrompt(plans) {
-    return [
-      'REVISION NOTES — MERGE',
-      'These are plans for consecutive parts of the same reading. Write one short title and ONE topic map (3-6 short lines, using →) for the whole reading.',
-      plans.map(function (p, i) { return 'Part ' + (i + 1) + ': ' + p.title + '\n' + (p.topicMap || []).join('\n'); }).join('\n\n'),
-      'Reply with ONLY JSON: {"title": "", "topicMap": [""]}'
-    ].join('\n');
-  }
-
   /* ---- cleaning what comes back ---- */
   function s_(v, n) { return cleanString(v == null ? '' : String(v), n || 2000).trim(); }
   function arr(v, n, m) { return (Array.isArray(v) ? v : []).map(function (x) { return s_(x, m || 600); }).filter(Boolean).slice(0, n || 12); }
@@ -265,106 +182,10 @@
     return !keys.length || keys.some(function (k) { return norm.indexOf(k) !== -1; });
   }
 
-  /* ---- writing a document ---- */
-  function startRn() {
-    var ids = rn.sel.slice();
-    if (!ids.length) { toast('Tick at least one source.'); return; }
-    if (!claudeCaps.sample) { toast('Revision notes are written by Claude, which works when the app is opened in claude.ai.', { type: 'error' }); return; }
-    var job = rn.job = { ctl: new AbortController(), steps: [], error: '', done: false };
-    rn.view = 'gen'; renderRn();
-    var step = function (label) { var s = { label: label, state: 'run' }; job.steps.push(s); renderRnProgress(); return s; };
-    var ask = function (prompt, s) {
-      // One automatic retry: a long section can occasionally come back cut short.
-      var go = function (tries) {
-        return claudeCaps.sample.json(prompt, { signal: job.ctl.signal, cache: false }).then(null, function (err) {
-          if (err && err.code === 'cancelled') throw err;
-          if (tries < 1 && (!err || err.code === 'invalid_json' || err.code === 'unavailable' || err.code === 'rate_limited')) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return go(tries + 1); });
-          throw err;
-        });
-      };
-      return go(0).then(function (r) { if (s) s.state = 'ok'; renderRnProgress(); return r; }, function (err) { if (s) s.state = 'bad'; renderRnProgress(); throw err; });
-    };
-    // Run tasks two at a time.
-    var pool = function (tasks) {
-      var i = 0, results = [];
-      var worker = function () { if (job.ctl.signal.aborted || i >= tasks.length) return Promise.resolve(); var k = i++; return tasks[k]().then(function (r) { results[k] = r; }, function (e) { if (e && e.code === 'cancelled') throw e; results[k] = { error: e }; }).then(worker); };
-      return Promise.all([worker(), worker()]).then(function () { return results; });
-    };
-    var srcs, pages, norm, plans, doc;
-    var s0 = step('Reading your sources');
-    Promise.all(ids.map(function (id) { return loadSourceText(id).then(function (t) { var m = sourceById(id); return { id: id, title: m ? m.title : id, module: m ? m.module : '', text: t || '' }; }); })).then(function (list) {
-      srcs = list.filter(function (s) { return s.text.trim(); });
-      if (!srcs.length) throw { code: 'empty', message: 'Those sources have no text to work from.' };
-      pages = rnPages(srcs);
-      norm = normText(srcs.map(function (s) { return s.text; }).join(' '));
-      s0.state = 'ok';
-      var chunks = rnChunks(pages), titles = srcs.map(function (s, i) { return 'S' + (i + 1) + ' = ' + s.title; }).join('; ');
-      return pool(chunks.map(function (c, i) { var s = step(chunks.length > 1 ? 'Planning part ' + (i + 1) + ' of ' + chunks.length : 'Planning the notes'); return function () { return ask(planPrompt(c, titles, i + 1, chunks.length), s); }; }));
-    }).then(function (res) {
-      plans = res.filter(function (p) { return p && !p.error && Array.isArray(p.sections); });
-      if (!plans.length) throw (res[0] && res[0].error) || { code: 'invalid_json' };
-      var mod = srcs.map(function (s) { return s.module; }).filter(Boolean)[0] || '';
-      doc = { id: uid('rn'), title: rn.title || '', module: mod, createdAt: nowISO(), sources: srcs.map(function (s) { return { id: s.id, title: s.title }; }),
-        topicMap: [], sections: [], hooks: [], terms: [], cases: [], outcomes: [] };
-      var secs = [], hooks = [], terms = {}, cases = {}, outcomes = [];
-      plans.forEach(function (p) {
-        (p.sections || []).forEach(function (s) { if (s && s_(s.title)) secs.push({ title: s_(s.title, 200), pages: arr(s.pages, 30, 20), principles: arr(s.principles, 14, 200) }); });
-        (p.hooks || []).forEach(function (h) { if (h && s_(h.title)) hooks.push({ title: s_(h.title, 300), pages: arr(h.pages, 10, 20) }); });
-        (p.terms || []).forEach(function (t) { var k = s_(t && t.term, 200); if (k && !terms[k.toLowerCase()]) terms[k.toLowerCase()] = { term: k, page: s_(t.page, 20) }; });
-        (p.cases || []).forEach(function (c) { var k = s_(c && c.name, 300); if (k && !cases[normText(k)]) cases[normText(k)] = { name: k, page: s_(c.page, 20) }; });
-        arr(p.outcomes, 20, 600).forEach(function (o) { if (outcomes.indexOf(o) === -1) outcomes.push(o); });
-      });
-      hooks = hooks.slice(0, 3);
-      var tasks = [];
-      if (plans.length > 1) { var sm = step('Joining the parts together'); tasks.push(function () { return ask(mergePrompt(plans), sm).then(function (r) { doc.topicMap = arr(r && r.topicMap, 8, 300); if (!doc.title) doc.title = s_(r && r.title, 200); }); }); }
-      else { doc.topicMap = arr(plans[0].topicMap, 8, 300); if (!doc.title) doc.title = s_(plans[0].title, 200); }
-      secs.forEach(function (sec, i) {
-        var st = step('Key principles: ' + sec.title);
-        tasks.push(function () {
-          return ask(sectionPrompt(sec, pagesFor(pages, sec.pages, [sec.title].concat(sec.principles))), st).then(function (r) {
-            doc.sections[i] = { title: sec.title, entries: (Array.isArray(r && r.entries) ? r.entries : []).map(cleanEntry).filter(Boolean) };
-          }, function (err) { if (err && err.code === 'cancelled') throw err; doc.sections[i] = { title: sec.title, entries: [], failed: true }; });
-        });
-      });
-      if (hooks.length) { var sh = step('Memory hooks'); tasks.push(function () { return ask(hooksPrompt(hooks, pickPages(pages, [].concat.apply([], hooks.map(function (h) { return h.pages; })))), sh).then(function (r) { doc.hooks = (r && r.hooks) || []; }, function () { doc.hooks = []; }); }); }
-      var tl = Object.keys(terms).map(function (k) { return terms[k]; }), cl = Object.keys(cases).map(function (k) { return cases[k]; });
-      for (var t = 0; t < tl.length; t += 30) (function (batch, n) {
-        var sg = step('Plain English glossary' + (tl.length > 30 ? ' (' + n + ')' : ''));
-        tasks.push(function () { return ask(glossaryPrompt(batch.map(function (x) { return x.term; }), pickPages(pages, batch.map(function (x) { return x.page; }), 40000)), sg).then(function (r) { doc.terms = doc.terms.concat((r && r.terms) || []); }, function () { batch.forEach(function (x) { doc.terms.push({ term: x.term, eli5: '', significance: '' }); }); }); });
-      })(tl.slice(t, t + 30), t / 30 + 1);
-      for (var c = 0; c < cl.length; c += 20) (function (batch, n) {
-        var sc = step('Case glossary' + (cl.length > 20 ? ' (' + n + ')' : ''));
-        tasks.push(function () { return ask(casesPrompt(batch.map(function (x) { return x.name; }), pickPages(pages, batch.map(function (x) { return x.page; }), 40000)), sc).then(function (r) { doc.cases = doc.cases.concat((r && r.cases) || []); }, function () { batch.forEach(function (x) { doc.cases.push({ name: x.name, citation: '', facts: '', ratio: '', supports: '', unverified: true }); }); }); });
-      })(cl.slice(c, c + 20), c / 20 + 1);
-      job.outcomes = outcomes;
-      return pool(tasks);
-    }).then(function () {
-      doc.sections = doc.sections.filter(Boolean);
-      if (!job.outcomes.length) return;
-      var so = step('Learning outcomes check');
-      return ask(outcomesPrompt(job.outcomes, doc.sections), so).then(function (r) { doc.outcomes = (r && r.outcomes) || []; }, function () { doc.outcomes = job.outcomes.map(function (o) { return { outcome: o, sections: [], note: 'Not checked.', covered: false }; }); });
-    }).then(function () {
-      doc = cleanRnDoc(doc);
-      if (!doc.title) doc.title = srcs.map(function (s) { return s.title; }).join(' + ').slice(0, 200);
-      // Check every case against the chosen sources.
-      doc.cases.forEach(function (c) { if (!rnInSources(c.name, norm)) c.notFound = true; });
-      doc.cases.sort(function (a, b) { return a.name.localeCompare(b.name); });
-      doc.terms.sort(function (a, b) { return a.term.localeCompare(b.term); });
-      doc.sections.forEach(function (s) { s.entries.forEach(function (e) { if (e.case && !rnInSources(e.case.name, norm)) e.case.notFound = true; }); });
-      var vs = step('Saving to your Revision notes');
-      return saveRnDoc(doc).then(function () { vs.state = 'ok'; job.done = true; rn.doc = doc; rn.view = 'view'; renderRn(); renderRnCount();
-        toast('Revision notes ready: “' + doc.title + '”.', { type: 'success' }); });
-    }).then(null, function (err) {
-      if (err && err.code === 'cancelled') return;
-      if (err && (err.code === 'not_granted' || err.code === 'sampling_disabled')) claudeCaps.sample = null;
-      job.error = err && err.message && err.code === 'empty' ? err.message : sampleErrorText(err);
-      renderRnProgress();
-    });
-  }
   function renderRnProgress() {
     if (rn.view !== 'gen' || !rn.job) return;
     var j = rn.job, done = j.steps.filter(function (s) { return s.state !== 'run'; }).length;
-    $('#rnBody').innerHTML = '<p class="muted" style="margin-top:0">Claude is working through your sources section by section, so nothing is skipped. Long chapters take a few minutes — you can keep this open or come back to it.</p>' +
+    $('#rnBody').innerHTML = '<p class="muted" style="margin-top:0">Claude lists every point in your sources first, then writes the posters from that list and checks each page against it, so nothing important is left out. This takes a few minutes — you can keep this open or come back to it.</p>' +
       '<div class="review-progress"><div class="bar"><i style="width:' + Math.round(done / Math.max(1, j.steps.length) * 100) + '%"></i></div><span>' + done + ' of ' + j.steps.length + ' steps</span></div>' +
       '<ol class="rn-steps">' + j.steps.map(function (s) { return '<li class="' + s.state + '"><span class="rn-st">' + (s.state === 'ok' ? '✓' : s.state === 'bad' ? '!' : '<span class="spinner"></span>') + '</span>' + esc(s.label) + '</li>'; }).join('') + '</ol>' +
       (j.error ? '<p class="step-note warn">' + esc(j.error) + '</p>' : '');
@@ -379,58 +200,72 @@
     renderRn();
     openModal($('#rnModal'));
   }
+  function rnFull(d) { return d && d.kind === 'poster' ? cleanPoster(d) : cleanRnDoc(d); }
   function renderRn() {
     var body = $('#rnBody'), foot = $('#rnFoot');
     if (rn.view === 'gen') return renderRnProgress();
     if (rn.view === 'view' && rn.doc) {
-      body.innerHTML = rnHTML(rn.doc);
-      foot.innerHTML = '<button type="button" class="btn" data-rn="list">← All revision notes</button><span class="spacer"></span><button type="button" class="btn btn-primary" data-rn="pdf" data-id="' + esc(rn.doc.id) + '">⬇ Download PDF</button>';
+      var poster = rn.doc.kind === 'poster';
+      body.innerHTML = poster ? posterViewHTML(rn.doc) : rnHTML(rn.doc);
+      foot.innerHTML = '<button type="button" class="btn" data-rn="list">← All posters</button><span class="spacer"></span>' +
+        (poster ? '<button type="button" class="btn" data-rn="cov" data-id="' + esc(rn.doc.id) + '">⬇ Coverage check</button>' : '') +
+        '<button type="button" class="btn btn-primary" data-rn="pdf" data-id="' + esc(rn.doc.id) + '">⬇ Download ' + (poster ? 'posters' : 'PDF') + '</button>';
       body.scrollTop = 0;
+      if (poster) setTimeout(function () { previewPoster(rn.doc); }, 30);
       return;
     }
     if (rn.view === 'new') {
       var groups = {};
       state.sources.forEach(function (s) { (groups[s.module || ''] = groups[s.module || ''] || []).push(s); });
       var order = MODULES.map(function (m) { return m.id; }).concat(['']);
-      body.innerHTML = '<p class="muted" style="margin-top:0">Tick the sources to turn into revision notes in your <b>Standard</b> format: topic map, key principles with authorities (each with an ELI5, the case story and the exam angle), memory hooks, a plain English glossary, a case glossary and — if your reading lists them — a learning outcomes check.</p>' +
+      body.innerHTML = '<p class="muted" style="margin-top:0">Tick the sources to turn into <b>revision posters</b>: up to 4 landscape A4 pages you can print, laid out as infographics (a tile-grid overview, flow maps for step-by-step tests, mind maps for factors, and a timeline with a case table). Claude picks the best layout for each page.</p>' +
         '<div class="form-field"><label class="lbl" for="rnTitle">Title <span class="hint">(optional — Claude suggests one)</span></label><input class="input" id="rnTitle" maxlength="200" value="' + esc(rn.title) + '" placeholder="e.g. Tort Ch 7 – Occupiers\' Liability"></div>' +
         '<div class="qz-topics rn-srcs">' + order.filter(function (m) { return groups[m]; }).map(function (m) {
           return '<div class="qz-mod">' + esc(MODULE_LABEL[m] || 'Other') + '</div>' + groups[m].map(function (s) {
             return '<label class="qz-topic"><input type="checkbox" data-rnsrc="' + esc(s.id) + '"' + (rn.sel.indexOf(s.id) !== -1 ? ' checked' : '') + '><span>' + esc(s.title) + '</span><small>' + (s.pages ? plural(s.pages, 'page') : Math.max(1, Math.round(s.chars / 6000)) + 'k words') + '</small></label>';
           }).join('');
         }).join('') + '</div>' +
-        '<p class="muted rn-note">Uses your Claude allowance: roughly one request per sub-topic plus a few for the glossaries — a typical chapter is 10–15 requests. Only your chosen sources are used, and every case is checked against them.</p>' +
-        (claudeCaps.sample ? '' : '<p class="step-note warn">Revision notes are written by Claude, which works when the app is opened in claude.ai.</p>');
-      foot.innerHTML = '<button type="button" class="btn" data-rn="list">Back</button><span class="spacer"></span><button type="button" class="btn btn-primary" data-rn="go"' + (claudeCaps.sample ? '' : ' disabled') + '>✦ Write revision notes</button>';
+        '<div class="rn-note-box"><b>The coverage check.</b> Before anything is drawn, Claude lists every principle, test, case, statute, exception and learning outcome in your sources, page by page. Each page is then checked against that list (and the source) by a separate pass; anything missing or wrong is fixed, and anything still missing is put back word for word. You see the full list, and where each point is, before you print.</div>' +
+        '<p class="muted rn-note">Uses your Claude allowance: about 8–16 requests for a chapter (more for several chapters). Only your chosen sources are used, and every case is checked against them.</p>' +
+        (claudeCaps.sample ? '' : '<p class="step-note warn">Posters are written by Claude, which works when the app is opened in claude.ai.</p>');
+      foot.innerHTML = '<button type="button" class="btn" data-rn="list">Back</button><span class="spacer"></span><button type="button" class="btn btn-primary" data-rn="go"' + (claudeCaps.sample ? '' : ' disabled') + '>✦ Make posters</button>';
       return;
     }
-    var list = state.rdocs.slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
-    body.innerHTML = (list.length ? '<div class="rn-list">' + list.map(function (m) {
+    var all = state.rdocs.slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
+    var item = function (m) {
+      var poster = m.kind === 'poster';
       return '<div class="rn-item"><div class="rn-item-text"><b>' + esc(m.title) + '</b><span>' + (m.module ? esc(MODULE_LABEL[m.module]) + ' · ' : '') +
-        new Date(m.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + plural(m.counts.principles, 'principle') + ', ' + plural(m.counts.cases, 'case') + ', ' + plural(m.counts.terms, 'term') + '</span>' +
+        new Date(m.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' +
+        (poster ? plural(m.counts.pages, 'page') + ' · ' + plural(m.counts.points, 'point') + ' checked' + (m.counts.check ? ' · <em class="rn-flag bad">' + m.counts.check + ' to check</em>' : '')
+          : plural(m.counts.principles, 'principle') + ', ' + plural(m.counts.cases, 'case')) + '</span>' +
         '<small>From: ' + esc(m.sources.map(function (s) { return s.title; }).join(', ')) + '</small></div>' +
         '<div class="rn-item-tools"><button type="button" class="btn btn-sm" data-rn="open" data-id="' + esc(m.id) + '">View</button>' +
         '<button type="button" class="btn btn-sm btn-primary" data-rn="pdf" data-id="' + esc(m.id) + '">⬇ PDF</button>' +
         '<button type="button" class="btn btn-sm btn-ghost" data-rn="delete" data-id="' + esc(m.id) + '">Delete</button></div></div>';
-    }).join('') + '</div>'
-      : '<div class="empty" style="padding:30px 16px"><h3>No revision notes yet</h3><p>Choose one or more sources and Claude turns them into your Standard notes, laid out as a PDF you can read, print or keep.</p></div>');
-    foot.innerHTML = '<span class="spacer"></span><button type="button" class="btn" data-close>Close</button><button type="button" class="btn btn-primary" data-rn="new">＋ New revision notes</button>';
+    };
+    var posters = all.filter(function (m) { return m.kind === 'poster'; }), old = all.filter(function (m) { return m.kind !== 'poster'; });
+    body.innerHTML = (posters.length ? '<div class="rn-list">' + posters.map(item).join('') + '</div>'
+      : '<div class="empty" style="padding:30px 16px"><h3>No revision posters yet</h3><p>Choose one or more sources and Claude turns them into up to 4 printable landscape posters, checked against your sources so nothing important is missed.</p></div>') +
+      (old.length ? '<details class="rn-old"><summary>Older long-form notes (' + old.length + ')</summary><div class="rn-list">' + old.map(item).join('') + '</div></details>' : '');
+    foot.innerHTML = '<span class="spacer"></span><button type="button" class="btn" data-close>Close</button><button type="button" class="btn btn-primary" data-rn="new">＋ New posters</button>';
   }
   function rnAction(a, el) {
     var id = el && el.getAttribute('data-id');
+    var busy = function (p) { el.disabled = true; return p.then(function () { el.disabled = false; }, function (err) { el.disabled = false; toast((err && err.message) || 'The PDF couldn\'t be made.', { type: 'error', timeout: 7000 }); }); };
     if (a === 'new') { rn.sel = rn.view === 'new' ? rn.sel : []; rn.title = ''; rn.view = 'new'; renderRn(); }
     else if (a === 'list') { rn.view = 'list'; renderRn(); }
-    else if (a === 'go') { var t = $('#rnTitle'); if (t) rn.title = t.value.trim(); startRn(); }
+    else if (a === 'go') { var t = $('#rnTitle'); if (t) rn.title = t.value.trim(); startPoster(); }
     else if (a === 'cancel') { if (rn.job) rn.job.ctl.abort(); rn.job = null; rn.view = 'new'; renderRn(); }
     else if (a === 'open') {
       $('#rnBody').innerHTML = '<p><span class="spinner"></span>Opening…</p>';
-      loadRnDoc(id).then(function (d) { rn.doc = cleanRnDoc(d); rn.view = 'view'; renderRn(); }, function () { toast('Those notes couldn\'t be opened.', { type: 'error' }); rn.view = 'list'; renderRn(); });
+      loadRnDoc(id).then(function (d) { rn.doc = rnFull(d); rn.view = 'view'; renderRn(); }, function () { toast('That couldn\'t be opened.', { type: 'error' }); rn.view = 'list'; renderRn(); });
     }
-    else if (a === 'pdf') { el.disabled = true; loadRnDoc(id).then(function (d) { return downloadRnPdf(cleanRnDoc(d)); }).then(function () { el.disabled = false; }, function (err) { el.disabled = false; toast((err && err.message) || 'The PDF couldn\'t be made.', { type: 'error', timeout: 7000 }); }); }
+    else if (a === 'pdf') busy(loadRnDoc(id).then(function (d) { d = rnFull(d); return d.kind === 'poster' ? downloadPoster(d) : downloadRnPdf(d); }));
+    else if (a === 'cov') busy(loadRnDoc(id).then(function (d) { return downloadCoverage(rnFull(d)); }));
     else if (a === 'delete') {
       var m = state.rdocs.filter(function (x) { return x.id === id; })[0]; if (!m) return;
-      dialog({ title: 'Delete these revision notes?', message: '“' + m.title + '” will be deleted. Your sources and cards are not affected.', buttons: [{ label: 'Cancel', value: false }, { label: 'Delete', value: true, style: 'btn-danger' }] })
-        .then(function (yes) { if (!yes) return; deleteRnDoc(id).then(function () { renderRn(); renderRnCount(); toast('Revision notes deleted.'); }); });
+      dialog({ title: 'Delete “' + m.title + '”?', message: 'It will be deleted for good. Your sources and cards are not affected.', buttons: [{ label: 'Cancel', value: false }, { label: 'Delete', value: true, style: 'btn-danger' }] })
+        .then(function (yes) { if (!yes) return; deleteRnDoc(id).then(function () { renderRn(); renderRnCount(); toast('Deleted.'); }); });
     }
   }
   function bindRn() {

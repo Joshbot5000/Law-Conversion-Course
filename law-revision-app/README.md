@@ -4,7 +4,7 @@ A single-page revision app for the law conversion course: flashcards with spaced
 and quote, lecture notes with automatic topic detection, Word-style formatting on cards, adaptive multi-topic quizzes
 (optionally limited to chosen sources) with an end-of-quiz review and practice aimed at your mistakes, a saved
 mistakes log, a timed exam mode, Quick test (generate a principle / case / statute with Claude checking your answer,
-distinguish two cases, fill in the blank), revision notes in the "Standard" format as PDFs, a guided Today's session, long-term study memory with "Work on next"
+distinguish two cases, fill in the blank), printable revision posters (up to 4 landscape infographic pages, with a coverage check against your sources), a guided Today's session, long-term study memory with "Work on next"
 suggestions, a weekly summary and a progress view, mock exams, and study tools (check cards against sources,
 find duplicates, exam pacing).
 
@@ -19,7 +19,7 @@ find duplicates, exam pacing).
 | `src/data.js`, `src/js_*.js` | The app's code, in parts (see `src/build.py` for the order) |
 | `src/build.py` | Joins the parts into one page |
 | `tests/` | Browser tests (Playwright) with a stand-in for claude.ai (`mockclaude.js`) |
-| `tests/sample_seed.js` | A made-up 77-card sample library used by the tests |
+| `tests/sample_seed.js` | A made-up 79-card sample library used by the tests |
 | `tests/fixtures/` | Made-up import files, PDF and Word document, plus `make_fixtures.py` that generates them |
 | `scripts/fetch_libs.sh` | Optional: saves pdf.js and mammoth locally so tests run offline |
 

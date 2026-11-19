@@ -50,10 +50,16 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - Quick test (`src/js_flash.js`) modes: principle / case / statute flashcards (typed answers checked by Claude against the card only),
   distinguish two cases (same topic), fill in the blank (local check with typo tolerance). `fl.limit` caps a run (Today's session uses 5).
 - Weekly summary: `perf.w` / `perf.wPrev` = weekly snapshots of topic scores, rolled on the first visit of a week (`maybeWeeklyRoll`).
-- Revision notes (`src/js_revnotes.js`): the owner's "Standard" notes format (from their law-study-notes skill) written from chosen
-  sources in stages (plan per ~110k-char chunk → one call per sub-topic with only its pages → hooks → glossary → case glossary →
-  outcomes check), with NO flashcards (the owner said the app already makes those). Case names are checked against the sources and
-  flagged if not found. Stored as `rdoc/<id>` (meta) + `rdocpart/<id>_<n>` (JSON in parts); browser key `lawRevisionApp.v1.rdocs`.
-  PDFs are made on demand with pdfmake 0.2.10 (Roboto has no arrows/ticks: `pdfSafe` swaps them).
+- Revision posters (`src/js_posters.js`, window + storage in `src/js_revnotes.js`): REPLACED the long "Standard" notes at the owner's
+  request (a 62-page set was "worse than the textbook"). Up to 4 landscape A4 infographic pages per set, layouts mixed per page
+  (tiles / flow / mindmap / cases), no flashcards. Pipeline: INVENTORY (every point in the sources per ~110k-char chunk, each with
+  type + priority must/should/detail + page ref) → PLAN (assign every id to a page; unassigned ids are placed locally) → PAGE
+  (one call per page, ~380-480 words, every id must be cited in `ids`) → CHECK (separate strict pass vs points + source) → FIX →
+  CHECK again → anything still missing is put back word for word in that page's "Also know" strip (`restored`); points still
+  "wrong" are flagged → OUTCOMES. Our own check (`psFind`: id present, and for cases/statutes the name too) runs alongside Claude's.
+  Every case is checked against the sources (`rnInSources`). The coverage report (in the app and as its own PDF) lists every point,
+  its priority, source page and where it is. PDFs are drawn with pdfmake; each page is shrunk/grown to fit exactly one page
+  (`psFit`, binary search over `PS_SCALES`), and shown in the app via pdf.js. Stored as `rdoc` (`kind: 'poster'`) + `rdocpart`.
+  Older long-form notes (v1, no kind) still list under "Older long-form notes" and open/download with the old code.
 - Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
   (hook `sessionModalClosed` in `closeModal`).

@@ -71,35 +71,72 @@
       out.push({ type: 'principle', name: 'Invented rule for testing', citation: 'Key authorities: Nobody v Nothing', topic: 'Testing', facts: '', ratio: 'A rule the text never states.', strategy: '', tags: ['test'], page: 1, quote: 'This sentence is not in the source at all.' });
       return JSON.stringify(out);
     }
-    if (text.indexOf('REVISION NOTES — ') !== -1) {
-      window.__mock.rn = (window.__mock.rn || 0) + 1;
-      var refs = []; var rr = /=== \[(S\d+:\d+)\] ===/g, mm; while ((mm = rr.exec(text))) refs.push(mm[1]);
-      var found = {}; var cr = /([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*) v ([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*)/g, cm;
-      while ((cm = cr.exec(text))) found[cm[0]] = true;
-      var caseNames = Object.keys(found).slice(0, 8);
-      if (text.indexOf('REVISION NOTES — PLAN') !== -1) return JSON.stringify({
-        title: 'Mock notes title', topicMap: ['Duty → Breach → Causation', 'Defences → Remedies'],
-        outcomes: /LEARNING OUTCOMES/.test(text) || window.__rnOutcomes ? ['Explain causation', 'Apply the but-for test'] : [],
-        sections: [{ title: 'Duty of care', pages: refs.slice(0, 1), principles: ['Neighbour principle', 'Incremental approach'] }, { title: 'Causation', pages: refs.slice(1, 2), principles: ['But-for test', 'Material contribution'] }],
-        hooks: [{ title: 'The but-for test', pages: refs.slice(1, 2) }],
-        terms: [{ term: 'Ratio decidendi', page: refs[0] }, { term: 'Novus actus interveniens', page: refs[1] || refs[0] }],
-        cases: caseNames.map(function (n) { return { name: n, page: refs[0] }; }).concat([{ name: 'Nobody v Nothing', page: refs[0] }])
-      });
-      if (text.indexOf('REVISION NOTES — SECTION') !== -1) {
-        if (window.__rnFailSection && text.indexOf('SECTION: Causation') !== -1) return 'not json';
-        return JSON.stringify({ entries: [
-          { principle: 'A manufacturer owes a duty to the ultimate consumer.', authority: caseNames[0] || 'Donoghue v Stevenson', eli5: 'Like a baker being careful for whoever eats the cake.', case: { name: caseNames[0] || 'Donoghue v Stevenson', citation: '[1932] AC 562', facts: 'A snail was said to be in a bottle.', decision: 'Duty owed.', ratio: 'Neighbour principle.', exam: 'Start every duty question here.' }, examAngle: 'Watch for a claimant who is not the buyer.', pros: ['Protects consumers'], cons: ['Wide liability'], added: false, unverified: false },
-          { principle: 'Courts develop duty incrementally.', authority: 'Robinson v Chief Constable of West Yorkshire', eli5: 'Small steps from decided cases.', case: null, examAngle: '', pros: [], cons: [], added: true, unverified: false }
-        ] });
+    if (text.indexOf('REVISION POSTERS — ') !== -1) {
+      var M = window.__mock; M.ps = (M.ps || 0) + 1;
+      var itemsIn = function (t) { var out = [], re = /^(i\d+) \[(\w+)\|(\w+)\] (.+?) — (.*)$/gm, x; while ((x = re.exec(t))) out.push({ id: x[1], type: x[2], pri: x[3], name: x[4], point: x[5].replace(/ \(.*$/, '').replace(/ \{.*$/, '') }); return out; };
+      var between = function (a, b) { var i = text.indexOf(a); if (i === -1) return ''; var j = b ? text.indexOf(b, i + a.length) : -1; return text.slice(i + a.length, j === -1 ? undefined : j); };
+      if (text.indexOf('REVISION POSTERS — INVENTORY') !== -1) {
+        var refs = []; var rr = /=== \[(S\d+:\d+)\] ===/g, mm; while ((mm = rr.exec(text))) refs.push(mm[1]);
+        var found = {}; var cr = /([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*) v ([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*)/g, cm;
+        while ((cm = cr.exec(text))) found[cm[0]] = true;
+        var items = [
+          { type: 'test', name: 'But-for test', point: 'Would the harm have happened but for the breach?', topic: 'Causation', page: refs[0], pri: 'must' },
+          { type: 'principle', name: 'Neighbour principle', point: 'Take care to avoid harming those closely affected.', topic: 'Duty', page: refs[0], pri: 'must' },
+          { type: 'statute', name: 'Compensation Act 2006 s1', point: 'Courts may consider deterring desirable activities.', topic: 'Breach', page: refs[0], pri: 'should' },
+          { type: 'exception', name: 'Omissions exception', point: 'A duty arises where D assumed responsibility.', topic: 'Duty', page: refs[0], pri: 'should' },
+          { type: 'definition', name: 'Novus actus interveniens', point: 'A new act that breaks the chain of causation.', topic: 'Causation', page: refs[1] || refs[0], pri: 'detail' }
+        ].concat(Object.keys(found).slice(0, 6).map(function (n, i) { return { type: 'case', name: n, cite: '', point: 'Decided a point about ' + n + '.', topic: i % 2 ? 'Causation' : 'Duty', page: refs[0], pri: i < 2 ? 'must' : 'should' }; }))
+          .concat([{ type: 'case', name: 'Nobody v Nothing', point: 'An invented case.', topic: 'Duty', page: refs[0], pri: 'detail' }])
+          .concat(window.__rnOutcomes ? [{ type: 'outcome', name: 'Explain causation', point: '', topic: '', page: refs[0], pri: 'must' }] : []);
+        return JSON.stringify({ title: 'Mock poster title', items: items });
       }
-      if (text.indexOf('REVISION NOTES — MEMORY HOOKS') !== -1) return JSON.stringify({ hooks: [{ title: 'The but-for test', hook: 'BUT the snail: would it have happened BUT FOR the breach?', steps: ['Breach', 'Would the harm have happened anyway?'] }] });
-      if (text.indexOf('REVISION NOTES — PLAIN ENGLISH GLOSSARY') !== -1) return JSON.stringify({ terms: [{ term: 'Ratio decidendi', eli5: 'The reason for the decision.', significance: 'Binding on lower courts.' }, { term: 'Novus actus interveniens', eli5: 'A new act that breaks the chain.', significance: 'Can break causation.' }] });
-      if (text.indexOf('REVISION NOTES — CASE GLOSSARY') !== -1) {
-        var list = text.split('\n').filter(function (l) { return / v /.test(l) && l.indexOf(';') !== -1; })[0] || '';
-        return JSON.stringify({ cases: list.split(';').map(function (n) { n = n.trim(); return { name: n, citation: '', facts: 'Facts of ' + n + '.', ratio: 'Rule from ' + n + '.', supports: 'Duty of care', unverified: false }; }) });
+      if (text.indexOf('REVISION POSTERS — PLAN') !== -1) {
+        var all = itemsIn(text), ids = all.map(function (x) { return x.id; });
+        if (window.__psForget) ids = ids.slice(0, -1);
+        var h = Math.ceil(ids.length / 2);
+        return JSON.stringify({ title: 'Mock poster title', pages: [{ style: 'tiles', title: 'The overview', ids: ids.slice(0, h) }, { style: window.__psStyle2 || 'cases', title: 'The cases', ids: ids.slice(h) }] });
       }
-      if (text.indexOf('REVISION NOTES — LEARNING OUTCOMES') !== -1) return JSON.stringify({ outcomes: [{ outcome: 'Explain causation', sections: [2], note: 'Covered by the but-for test.', covered: true }, { outcome: 'Apply the but-for test', sections: [2], note: 'Worked through.', covered: true }] });
-      if (text.indexOf('REVISION NOTES — MERGE') !== -1) return JSON.stringify({ title: 'Merged notes', topicMap: ['Part one → Part two'] });
+      if (text.indexOf('REVISION POSTERS — PAGE') !== -1) {
+        var mine = itemsIn(between('POINTS FOR THIS PAGE:', '\n\nSOURCE PAGES:'));
+        var style = (/Layout "(\w+)"/.exec(text) || [])[1];
+        var keep = window.__psNoOmit ? mine : mine.slice(0, -1);   // leave the last point out, to test the check
+        var pt = function (it) { return it.type === 'case' ? { case: it.name, cite: '', text: it.point, ids: [it.id] } : { lead: it.name, text: it.point, ids: [it.id] }; };
+        var c = { title: (/PAGE \d+ of \d+: (.*)/.exec(text) || [])[1], subtitle: 'Use this page to revise.', hub: null, blocks: [], timeline: [], rows: [], strip: [], traps: ['Do not confuse the stages.'], tips: ['Name the case, then apply it.'], also: [] };
+        if (style === 'cases') {
+          keep.filter(function (it) { return it.type === 'case'; }).forEach(function (it, i) { c.rows.push({ group: 'Causation', name: it.name, cite: '', facts: 'What happened in one line.', held: 'What was held.', use: 'When to use it.', tag: i === 0 ? 'CORE' : '', ids: [it.id] }); c.timeline.push({ year: String(1930 + i * 10), name: it.name.split(' v ')[0], tag: 'a point' }); });
+          var rest = keep.filter(function (it) { return it.type !== 'case'; });
+          if (rest.length) c.blocks.push({ label: 'RULES', kind: 'step', heading: 'Other rules', points: rest.map(pt), ids: [] });
+        } else if (style === 'mindmap') {
+          c.hub = { heading: 'Breach', text: 'Reasonable person', points: [] };
+          keep.forEach(function (it, i) { c.blocks.push({ label: 'Factor ' + (i + 1), kind: 'step', heading: it.name, points: [pt(it)], ids: [] }); });
+        } else if (style === 'flow') {
+          keep.forEach(function (it, i) { c.blocks.push({ label: 'Step ' + (i + 1), kind: i === keep.length - 1 ? 'branch' : 'step', heading: it.name, points: [pt(it)], ids: [] }); });
+        } else {
+          for (var k = 0; k < keep.length; k += 2) c.blocks.push({ label: 'Element ' + (k / 2 + 1), kind: 'step', heading: 'Part ' + (k / 2 + 1), test: 'The test for this part.', points: keep.slice(k, k + 2).map(pt), trap: 'A trap.', ids: [] });
+          c.strip.push({ heading: 'Answer structure', text: 'Duty, breach, causation, remoteness.', ids: [] });
+        }
+        return JSON.stringify(c);
+      }
+      if (text.indexOf('REVISION POSTERS — CHECK') !== -1) {
+        var pts = itemsIn(between('POINTS:', '\n\nPOSTER')), poster = between('POSTER (ids in square brackets show which point each part covers):', '\n\nSOURCE PAGES:');
+        var miss = pts.filter(function (it) { return !new RegExp('[\\[,]' + it.id + '[\\],]').test(poster); }).map(function (it) { return it.id; });
+        var wrong = [];
+        if (window.__psWrong && pts.length && !/Problem:/.test(text)) { M.wrongId = M.wrongId || pts[0].id; if (pts.some(function (p) { return p.id === M.wrongId; })) wrong.push({ id: M.wrongId, issue: 'The poster gives the wrong outcome; the source says the claim failed.' }); }
+        return JSON.stringify({ missing: miss, wrong: wrong });
+      }
+      if (text.indexOf('REVISION POSTERS — FIX') !== -1) {
+        M.fixes = (M.fixes || 0) + 1;
+        var page = JSON.parse(between('PAGE:\n', '\n\nSOURCE PAGES:'));
+        if (window.__psBadFix) return JSON.stringify(page);
+        var add = itemsIn(between('MISSING:\n', 'Reply with ONLY JSON'));
+        var target = page.blocks && page.blocks.length ? page.blocks[0] : null;
+        add.forEach(function (it) {
+          var p = it.type === 'case' ? { case: it.name, cite: '', text: it.point, ids: [it.id] } : { lead: it.name, text: it.point, ids: [it.id] };
+          if (target) target.points.push(p); else page.rows.push({ group: 'More', name: it.name, cite: '', facts: '-', held: it.point, use: '-', tag: '', ids: [it.id] });
+        });
+        return JSON.stringify(page);
+      }
+      if (text.indexOf('REVISION POSTERS — OUTCOMES') !== -1) return JSON.stringify({ outcomes: [{ n: 1, covered: true, where: 'Page 1 · Part 1', note: '' }] });
     }
     if (text.indexOf('quick test answer') !== -1) {
       var pair = text.indexOf('DISTINGUISH') !== -1;

@@ -47,7 +47,7 @@
         ' · ' + Math.max(1, Math.round(s.chars / 6000)) + 'k words · ' + cardsWord(linked[s.id] || 0) + ' linked</span></div>' +
         '<div class="src-tools"><button type="button" class="btn btn-sm" data-src="view">Read</button>' +
         '<button type="button" class="btn btn-sm btn-ask" data-src="draft"' + (claudeCaps.sample ? '' : ' disabled title="Open the app in claude.ai to draft cards"') + '>✦ Draft cards</button>' +
-        '<button type="button" class="btn btn-sm" data-src="rnotes"' + (claudeCaps.sample ? '' : ' disabled title="Open the app in claude.ai to write revision notes"') + ' title="Turn this source into Standard revision notes (PDF)">📄 Notes</button>' +
+        '<button type="button" class="btn btn-sm" data-src="rnotes"' + (claudeCaps.sample ? '' : ' disabled title="Open the app in claude.ai to make revision posters"') + ' title="Turn this source into printable revision posters">🗺 Poster</button>' +
         '<button type="button" class="btn btn-sm btn-ghost" data-src="delete" aria-label="Delete ' + esc(s.title) + '">Delete</button></div></div>';
     }).join('');
   }
