@@ -16,7 +16,7 @@
   var VD_MAX_CARDS = 40;
   var VD_KINDS = ['title', 'hypo', 'principle', 'steps', 'case', 'roundup', 'compare', 'apply', 'recap'];
   var VD_VOICES = { buttery: 'Warm', airy: 'Light', glassy: 'Clear', rounded: 'Soft' };
-  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, voice: 'buttery', rate: 1, cc: true, unsub: [] };
+  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, device: false, devTok: 0, voice: 'buttery', rate: 1, cc: true, unsub: [] };
   state.videos = [];
 
   /* ---- storage ---- */
@@ -432,7 +432,7 @@
   function vdLoadTts() {
     if (vd.ttsTried) return Promise.resolve(vd.tts);
     vd.ttsTried = true;
-    if (!window.claude || typeof window.claude.use !== 'function') return Promise.resolve(null);
+    if (!window.claude || typeof window.claude.use !== 'function') { vd.ttsReady = true; return Promise.resolve(null); }
     return window.claude.use('tts').then(function (t) {
       vd.tts = t || null;
       if (t) {
@@ -441,7 +441,7 @@
           if (e.state === 'idle' && vd.playing) {
             vd.playing = false; vd.paused = false;
             if (e.reason === 'completed') vd.ended = true;
-            else if (e.reason === 'not_granted' || e.reason === 'unavailable') { vd.tts = null; toast('Reading aloud is off for this app, so the video plays with captions.'); }
+            else if (e.reason === 'not_granted' || e.reason === 'unavailable') { vdVoiceOff(e.reason); }
             else if (e.reason === 'rate_limited') toast('The voice needs a short break. Try again in a little while, or watch with captions.', { type: 'error' });
             renderVdControls();
           }
@@ -449,8 +449,9 @@
         }));
         if (t.setRate) t.setRate(vd.rate).then(null, function () {});
       }
+      vd.ttsReady = true; renderVdControls();
       return vd.tts;
-    }, function () { vd.tts = null; return null; });
+    }, function () { vd.tts = null; vd.ttsReady = true; renderVdControls(); return null; });
   }
   function fontsOnce() {
     if (document.getElementById('vdFonts')) return;
@@ -490,7 +491,7 @@
       '<label class="vd-sel">Speed <select id="vdRate">' + [0.85, 1, 1.15, 1.3].map(function (r) { return '<option value="' + r + '"' + (r === vd.rate ? ' selected' : '') + '>' + r + '×</option>'; }).join('') + '</select></label>' +
       '<button type="button" class="btn btn-sm' + (vd.cc ? ' on' : '') + '" data-vd="cc" aria-pressed="' + vd.cc + '">CC</button>' +
       '<button type="button" class="btn btn-sm btn-ghost" data-vd="full" title="Full screen">⛶</button></div>' +
-      (voiced ? '' : '<p class="vd-novoice">' + (vd.ttsTried ? 'The tutor\'s voice works when this app is open in Chrome or Edge on claude.ai, or in the Claude desktop app. Here the video plays with captions.' : '') + '</p>');
+      '<p class="vd-novoice">' + vdVoiceNote() + '</p>';
   }
   function vdPlay(from) {
     var v = vd.cur; if (!v) return;
@@ -505,12 +506,13 @@
       vd.tts.speak(lines, { rate: vd.rate, voice: vd.voice }).then(null, function (err) {
         if (!err || err.code === 'stopped') return;
         vd.playing = false;
-        if (err.code === 'not_granted' || err.code === 'unavailable') { vd.tts = null; toast('Reading aloud isn\'t available here, so the video plays with captions.'); vdPlay(vd.scene); return; }
+        if (err.code === 'not_granted' || err.code === 'unavailable') { vdVoiceOff(err.code); vdPlay(vd.scene); return; }
         toast(err.code === 'rate_limited' ? 'The voice needs a short break — try again soon, or watch with captions.' : err.code === 'no_gesture' ? 'Press Play again to start the voice.' : 'The voice stopped unexpectedly. Press Play to carry on.', { type: 'error' });
         renderVdControls();
       });
       return;
     }
+    if (vd.device && window.speechSynthesis) { vdDeviceSay(from); return; }
     // No voice here: captions, timed to roughly how long the words take to say.
     var tick = function () {
       if (!vd.playing || vd.paused) return;
@@ -522,13 +524,51 @@
     };
     tick();
   }
+  // Where the Claude voice is offered, why not, and what to do.
+  function vdVoiceOff(code) {
+    vd.tts = null;
+    if (code === 'not_granted') { vd.ttsOff = true; try { localStorage.setItem('lawRevisionApp.v1.ttsOff', '1'); } catch (e) { /* ignore */ } }
+    toast(code === 'not_granted' ? 'Reading aloud is turned off for this app. You can turn it back on in the app\'s Permissions menu.' : 'The voice isn\'t available just now, so the video plays with captions.');
+    renderVdControls();
+  }
+  function vdVoiceNote() {
+    if (vd.tts) return '🔊 <b>Tutor voice on.</b> Press Play and turn your sound up. Hear nothing? Check your device isn\'t muted, and that <i>Read aloud</i> is allowed in this app\'s Permissions menu (at the top of the page on claude.ai).';
+    if (!vd.ttsReady) return '<span class="spinner"></span>Checking for the tutor voice…';
+    var dev = window.speechSynthesis && typeof window.SpeechSynthesisUtterance === 'function';
+    var why = vd.ttsOff ? '🔇 <b>Reading aloud is turned off for this app.</b> To hear the tutor, turn <i>Read aloud</i> back on in the app\'s Permissions menu at the top of the page on claude.ai, then reopen the app.'
+      : '🔇 <b>The Claude tutor voice isn\'t offered in this view.</b> It works when the app is opened on claude.ai in <b>Chrome or Edge on a computer</b>, or in the main window of the <b>Claude desktop app</b>. It isn\'t available in Safari, Firefox, the Claude phone apps, side panels, or the offline copy.';
+    if (vd.ttsOff || !dev) return why;
+    return why + '<br><label class="vd-dev"><input type="checkbox" id="vdDevice"' + (vd.device ? ' checked' : '') + '> Use this device\'s own voice instead <span class="muted">(less natural, but you get sound here)</span></label>';
+  }
+  // Fallback voice: the device's speech, sentence by sentence (long single utterances cut out in some browsers).
+  function vdBestVoice() {
+    var vs = (window.speechSynthesis.getVoices() || []).filter(function (v) { return /^en/i.test(v.lang); });
+    var score = function (v) { return (/en[-_]GB/i.test(v.lang) ? 4 : 0) + (/natural|neural|premium|enhanced|siri/i.test(v.name) ? 6 : 0) + (/google uk/i.test(v.name) ? 3 : 0) + (v.localService ? 0 : 1); };
+    return vs.sort(function (a, b) { return score(b) - score(a); })[0] || null;
+  }
+  function vdDeviceSay(from) {
+    var v = vd.cur, ss = window.speechSynthesis, tok = ++vd.devTok, voice = vdBestVoice();
+    ss.cancel();
+    v.scenes.slice(from).forEach(function (sc, k) {
+      var i = from + k, parts = sc.narration.match(/[^.!?]+[.!?]*\s*/g) || [sc.narration];
+      parts.forEach(function (txt, j) {
+        var u = new SpeechSynthesisUtterance(txt.trim());
+        if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-GB';
+        u.rate = vd.rate;
+        if (j === 0) u.onstart = function () { if (tok === vd.devTok && vd.playing && vd.scene !== i) vdShow(i); };
+        if (i === v.scenes.length - 1 && j === parts.length - 1) u.onend = function () { if (tok === vd.devTok && vd.playing) { vd.playing = false; vd.ended = true; renderVdControls(); } };
+        ss.speak(u);
+      });
+    });
+  }
   function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
-  function vdStop() { stopVdTimer(); var was = vd.playing; vd.playing = false; vd.paused = false; if (was && vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdStop() { stopVdTimer(); var was = vd.playing; vd.playing = false; vd.paused = false; if (was && vd.tts) vd.tts.stop().then(null, function () {}); if (vd.device && window.speechSynthesis) { vd.devTok++; window.speechSynthesis.cancel(); } if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
   function vdPause() {
     if (!vd.playing) return;
     vd.paused = !vd.paused;
     $('#vdStage').classList.toggle('paused', vd.paused);
     if (vd.tts) (vd.paused ? vd.tts.pause() : vd.tts.resume()).then(null, function () {});
+    else if (vd.device && window.speechSynthesis) { if (vd.paused) window.speechSynthesis.pause(); else window.speechSynthesis.resume(); }
     else if (!vd.paused) { var keep = vd.scene; vd.playing = false; vd.scene = keep; vdPlay(keep); return; }
     else stopVdTimer();
     renderVdControls();
@@ -601,6 +641,7 @@
     }
   }
   function bindVideo() {
+    try { vd.device = localStorage.getItem('lawRevisionApp.v1.deviceVoice') === '1'; vd.ttsOff = localStorage.getItem('lawRevisionApp.v1.ttsOff') === '1'; } catch (e) { /* ignore */ }
     $('#vdBtn').addEventListener('click', function () { openVideo(); });
     var m = $('#vdModal');
     m._onClose = function () { vdStop(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
@@ -608,6 +649,7 @@
     m.addEventListener('change', function (ev) {
       var t = ev.target;
       if (t.id === 'vdTopic') { vd.topic = t.value; renderVideo(); }
+      else if (t.id === 'vdDevice') { vdStop(); vd.device = t.checked; try { localStorage.setItem('lawRevisionApp.v1.deviceVoice', vd.device ? '1' : ''); } catch (e) { /* ignore */ } renderVdControls(); }
       else if (t.id === 'vdVoice') { vd.voice = t.value; if (vd.playing) vdPlay(vd.scene); }
       else if (t.id === 'vdRate') { vd.rate = +t.value || 1; if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
     });

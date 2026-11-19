@@ -55,6 +55,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.screenshot({ path: path.join(T, 'vd_title.png'), clip: await page.$eval('#vdStage', e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }) });
 
   // 4. Playing with the voice
+  ok(/Tutor voice on/.test(await page.textContent('#vdCtl')) && await page.$('#vdVoice'), 'says the tutor voice is on, with a voice picker');
   await page.click('[data-vd="play"]');
   await page.waitForFunction(() => window.__mock.tts && window.__mock.tts.length === 1);
   const sp = await page.evaluate(() => window.__mock.tts[0]);
@@ -104,7 +105,14 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 
   // 8. Where the voice isn't available (Safari, mobile apps, friends outside your organisation): captions, auto-advancing
   const ctx2 = await b.newContext(); await ctx2.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());
-  await ctx2.addInitScript({ path: path.join(T, 'sample_seed.js') }); await ctx2.addInitScript(() => { window.__noTts = true; window.__vdFast = 20; window.__vdAll = true; }); await ctx2.addInitScript({ path: path.join(T, 'mockclaude.js') });
+  await ctx2.addInitScript({ path: path.join(T, 'sample_seed.js') }); await ctx2.addInitScript(() => {
+    window.__noTts = true; window.__vdFast = 20; window.__vdAll = true; window.__said = [];
+    // A stand-in for the device's own speech: each sentence "plays" for 20 ms.
+    const q = []; let busy = false;
+    const run = () => { if (busy || !q.length) return; busy = true; const u = q.shift(); window.__said.push(u.text); u.onstart && u.onstart(); setTimeout(() => { busy = false; u.onend && u.onend(); run(); }, 20); };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: u => { q.push(u); run(); }, cancel: () => { q.length = 0; }, pause: () => {}, resume: () => {}, getVoices: () => [{ name: 'Daniel (Enhanced)', lang: 'en-GB', localService: true }, { name: 'Fred', lang: 'en-US', localService: true }] } });
+    window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+  }); await ctx2.addInitScript({ path: path.join(T, 'mockclaude.js') });
   const q = await ctx2.newPage(); q.on('pageerror', e => errs.push(e.message));
   await q.goto('file://' + path.join(T, 'online_wrapped.html'));
   await q.waitForFunction(n => document.querySelector('#statTotal').textContent === String(n), N);
@@ -112,10 +120,17 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await q.click('#vdBtn'); await q.click('[data-vd="new"]'); await q.selectOption('#vdTopic', 'contract|Promissory Estoppel'); await q.click('[data-vd="make"]');
   await q.waitForSelector('#vdStage svg', { timeout: 20000 });
   ok(/Covers 4 of 4 cards/.test(await q.textContent('.vd-head')), 'nothing added when the script covers every card');
-  ok(/voice works when this app is open in Chrome or Edge/.test(await q.textContent('#vdCtl')) && !(await q.$('#vdVoice')), 'no voice here: says where it works, hides the voice picker');
+  ok(/isn't offered in this view/.test(await q.textContent('#vdCtl')) && /Chrome or Edge on a computer/.test(await q.textContent('#vdCtl')) && !(await q.$('#vdVoice')), 'no Claude voice here: says so clearly and where it works');
+  ok(await q.$('#vdDevice'), "offers this device's own voice instead");
   await q.click('[data-vd="play"]');
   await q.waitForFunction(() => /^3 \/ 9$/.test(document.querySelector('#vdStage svg text:last-of-type').textContent), null, { timeout: 8000 });
   ok(await q.isVisible('#vdCap'), 'plays with captions, moving through the scenes on its own');
+  await q.click('[data-vd="stop"]').catch(() => {});
+  await q.check('#vdDevice'); await q.click('.vd-dot[data-i="0"]'); await q.click('[data-vd="play"]');
+  await q.waitForFunction(() => window.__said.length > 5, null, { timeout: 8000 });
+  ok(await q.evaluate(() => window.__said[0].startsWith('Hi!')), "with the device voice ticked, it reads the narration aloud, sentence by sentence");
+  await q.waitForFunction(() => /Play again/.test(document.querySelector('#vdCtl').textContent), null, { timeout: 15000 });
+  ok(/^9 \/ 9$/.test(await q.textContent('#vdStage svg text:last-of-type')), 'scenes follow the device voice to the end');
   ok(errs.length === 0, 'no page errors ' + errs.join(' | '));
   await b.close();
 })();
