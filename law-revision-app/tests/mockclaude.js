@@ -71,6 +71,23 @@
       out.push({ type: 'principle', name: 'Invented rule for testing', citation: 'Key authorities: Nobody v Nothing', topic: 'Testing', facts: '', ratio: 'A rule the text never states.', strategy: '', tags: ['test'], page: 1, quote: 'This sentence is not in the source at all.' });
       return JSON.stringify(out);
     }
+    if (text.indexOf('EXPLAINER VIDEO SCRIPT') !== -1) {
+      var cards = [], cre = /^\[([^\]]+)\] (\w+) \| ([^|]+) \|/gm, cx;
+      while ((cx = cre.exec(text))) cards.push({ id: cx[1], type: cx[2], name: cx[3].trim() });
+      var cs = cards.filter(function (c) { return c.type === 'case'; }), keep = window.__vdAll ? cards : cards.slice(0, -1);   // leave the last card out, to test the coverage check
+      var sc = [
+        { kind: 'title', heading: 'Promises you can rely on', narration: 'Hi! Let us make this topic simple. Grab a cup of tea.', cards: [], visual: { kind: 'title', title: 'Promises you can rely on', subtitle: 'A quick refresher', icons: ['handshake', 'scales', 'house'] } },
+        { kind: 'hypo', heading: 'Meet Sam and Priya', narration: 'Imagine Sam rents a flat from Priya. Priya promises to halve the rent. Can she change her mind later?', cards: [], visual: { kind: 'hypo', characters: [{ name: 'Sam', icon: 'person' }, { name: 'Priya', icon: 'worker' }], props: ['house', 'money'], bubble: 'I will halve your rent!', label: 'Imagine...' } },
+        { kind: 'steps', heading: 'The test', narration: 'There are four things to check, one after another.', cards: keep.filter(function (c) { return c.type !== 'case'; }).map(function (c) { return c.id; }), visual: { kind: 'steps', steps: [{ label: 'A clear promise', icon: 'letter' }, { label: 'Reliance', icon: 'person' }, { label: 'Inequitable to go back', icon: 'scales' }, { label: 'Shield not sword', icon: 'lock' }] } },
+        { kind: 'case', heading: 'The famous case', narration: 'In ' + (cs[0] ? cs[0].name : 'a case') + ', the landlord promised lower rent during the war. The court said that promise counted. Also, Invented v Nobody said something else.', cards: cs[0] ? [cs[0].id] : [], visual: { kind: 'case', name: cs[0] ? cs[0].name : 'Case', year: '1947', panels: [{ icon: 'house', label: 'Rent halved in the war' }, { icon: 'gavel', label: 'Promise binding' }, { icon: 'scales', label: 'Promises can be enforced' }] } },
+        { kind: 'roundup', heading: 'More cases', narration: 'Two more quick ones.', cards: keep.filter(function (c) { return c.type === 'case'; }).slice(1).map(function (c) { return c.id; }), visual: { kind: 'roundup', cases: keep.filter(function (c) { return c.type === 'case'; }).slice(1, 3).map(function (c) { return { name: c.name, label: 'A short rule', icon: 'gavel' }; }) } },
+        { kind: 'compare', heading: 'Shield or sword?', narration: 'Here is the difference between the two ideas.', cards: [], visual: { kind: 'compare', left: { title: 'Shield', icon: 'lock', points: ['Defence only'] }, right: { title: 'Sword', icon: 'cross', points: ['No new claim'] } } },
+        { kind: 'principle', heading: 'The big rule', narration: 'So the big rule is simple.', cards: [], visual: { kind: 'principle', icon: 'scales', rule: 'A clear promise relied on can bind', points: ['Clear', 'Relied on', 'Fair'] } },
+        { kind: 'apply', heading: 'Back to Sam', narration: 'So can Priya go back? Not for the past rent.', cards: [], visual: { kind: 'apply', characters: [{ name: 'Sam', icon: 'person' }], verdict: 'Sam is protected', good: true } },
+        { kind: 'recap', heading: 'Recap', narration: 'Let us recap the key points.', cards: [], visual: { kind: 'recap', points: ['Clear promise', 'Reliance', 'Fairness', 'Shield not sword'] } }
+      ];
+      return JSON.stringify({ title: 'Mock explainer', scenes: sc });
+    }
     if (text.indexOf('REVISION POSTERS — ') !== -1) {
       var M = window.__mock; M.ps = (M.ps || 0) + 1;
       var itemsIn = function (t) { var out = [], re = /^(i\d+) \[(\w+)\|(\w+)\] (.+?) — (.*)$/gm, x; while ((x = re.exec(t))) out.push({ id: x[1], type: x[2], pri: x[3], name: x[4], point: x[5].replace(/ \(.*$/, '').replace(/ \{.*$/, '') }); return out; };
@@ -188,5 +205,34 @@
   }
   sample.json = function (input, opts) { return sample(input, Object.assign({}, opts, { onText: null })).then(function (r) { return JSON.parse(r.text); }); };
   var downloads = { save: function (r) { window.__mock.saved = { filename: r.filename, size: r.data.length, data: r.data }; return Promise.resolve({}); } };
-  window.claude = { use: function (n) { return Promise.resolve(n === 'db' ? (window.__noDb ? null : db) : n === 'sample' ? sample : n === 'downloads' ? downloads : null); } };
+  // A stand-in for the platform voice: each line "plays" for __ttsLineMs, firing onLine / onState like the real one.
+  var tl = { state: [], line: [] }, cur = null;
+  var ttsState = function (st, reason) { tl.state.forEach(function (f) { f({ state: st, reason: reason }); }); };
+  var tts = {
+    speak: function (lines, opts) {
+      if (cur) { cur.end('replaced'); }
+      lines = typeof lines === 'string' ? [{ text: lines }] : lines;
+      window.__mock.tts = (window.__mock.tts || []).concat([{ lines: lines.map(function (l) { return { id: l.id, voice: l.voice, len: l.text.length }; }), opts: opts }]);
+      if (lines.some(function (l) { return !l.text || l.text.length > 2000; })) return Promise.reject({ code: 'invalid_argument', message: 'bad line' });
+      return new Promise(function (res, rej) {
+        var i = 0, t = null, me = { paused: false };
+        me.end = function (reason) { clearTimeout(t); cur = null; ttsState('idle', reason); rej({ code: 'stopped', reason: reason }); };
+        me.go = function () { if (me.paused) return; if (i >= lines.length) { cur = null; ttsState('idle', 'completed'); res({ playedMs: 1000 }); return; } var l = lines[i]; tl.line.forEach(function (f) { f({ line: i, id: l.id }); }); i++; t = setTimeout(me.go, window.__ttsLineMs || 250); };
+        me.pause = function () { me.paused = true; clearTimeout(t); ttsState('paused'); };
+        me.resume = function () { me.paused = false; ttsState('speaking'); me.go(); };
+        cur = me; ttsState('starting'); setTimeout(function () { ttsState('speaking'); me.go(); }, 10);
+      });
+    },
+    add: function (l) { return tts.speak(l); },
+    stop: function () { if (cur) cur.end('stopped'); return Promise.resolve(); },
+    pause: function () { if (cur) cur.pause(); return Promise.resolve(); },
+    resume: function () { if (cur) cur.resume(); return Promise.resolve(); },
+    setRate: function (r) { window.__mock.rate = r; return Promise.resolve(); },
+    active: function () { return !!cur; },
+    voices: function () { return Promise.resolve(['buttery', 'airy', 'glassy', 'rounded']); },
+    onState: function (f) { tl.state.push(f); return function () {}; },
+    onLine: function (f) { tl.line.push(f); return function () {}; },
+    onPosition: function () { return function () {}; }
+  };
+  window.claude = { use: function (n) { return Promise.resolve(n === 'db' ? (window.__noDb ? null : db) : n === 'sample' ? sample : n === 'downloads' ? downloads : n === 'tts' ? (window.__noTts ? null : tts) : null); } };
 })();

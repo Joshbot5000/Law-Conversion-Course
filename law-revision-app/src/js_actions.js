@@ -144,7 +144,7 @@
         count: state.entries.length, entries: state.entries, progress: state.progress, stats: state.stats, prefs: state.prefs,
         sources: sources.filter(Boolean),
         notes: state.notes.filter(function (n) { return !n._draft; }).map(noteForStorage),
-        perf: state.perf, mistakes: state.mistakes, rdocs: rdocs
+        perf: state.perf, mistakes: state.mistakes, rdocs: rdocs, videos: state.videos
       };
       var json = JSON.stringify(payload, null, 1);
       var d = new Date();
@@ -204,6 +204,7 @@
       }).then(function (choice) {
         if (!choice) return;
         importMemory(data, choice);
+        importVideos(data.videos).then(function (k) { if (k) { renderVideoCount(); setTimeout(function () { toast(plural(k, 'explainer video') + ' imported.', { type: 'success' }); }, 1100); } });
         importRnDocs(data.rdocs).then(function (k) { if (k) { renderRnCount(); setTimeout(function () { toast(plural(k, 'set') + ' of revision notes imported.', { type: 'success' }); }, 900); } });
         if (importedNotes) { var nn = importNotes(importedNotes, choice); if (nn) setTimeout(function () { toast(plural(nn, 'lecture note') + ' imported.', { type: 'success' }); }, 600); }
         var seen = {};

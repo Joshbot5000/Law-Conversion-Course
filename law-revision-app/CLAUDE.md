@@ -5,7 +5,7 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 
 ## Golden rules
 - **Publish updates to the same URL** (Artifact publish with `url` = the link above). Never create a new artifact for
-  the app and never delete it. Capabilities (sample, db with an owner-only rule, downloads) carry forward; leave them alone.
+  the app and never delete it. Capabilities (sample, db with an owner-only rule, downloads, tts) carry forward; leave them alone (omit `capabilities` on publish).
 - **Never delete, overwrite or "reset" the owner's cards**, and never write to the artifact database unless asked.
   Any change to how entries are stored must keep old entries loading (see `sanitizeEntry` in `src/js_core.js`).
 - **This repo is public.** Never commit the owner's library, exports, textbook text or lecture notes. Tests use only
@@ -19,7 +19,7 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - A second artifact, https://claude.ai/artifact/MQEG6zDGu7GzNpf1HoJUCd, for the owner's friends. Same code with
   `EDITION = 'friends'`: each friend's library is saved in their own browser (IndexedDB, `src/js_friends.js`),
   seeded on first open from a STARTER copy of the owner's library built into the page. It never declares or uses `db`;
-  it declares only `sample` and `downloads`, so Claude features run on each friend's own claude.ai account.
+  it declares only `sample`, `downloads` and `tts`, so Claude features run on each friend's own claude.ai account.
 - Build: `python3 src/build.py --friends /path/outside/repo/starter.json /path/outside/repo/law-revision-friends.html`.
   starter.json is `{entries, sources:{meta, text}}` read from the owner's artifact database (lib, src, srctext;
   not progress, prefs or notes). **Never commit starter.json or a friends build** (both are gitignored).
@@ -61,5 +61,15 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   its priority, source page and where it is. PDFs are drawn with pdfmake; each page is shrunk/grown to fit exactly one page
   (`psFit`, binary search over `PS_SCALES`), and shown in the app via pdf.js. Stored as `rdoc` (`kind: 'poster'`) + `rdocpart`.
   Older long-form notes (v1, no kind) still list under "Older long-form notes" and open/download with the old code.
+- Explainer videos (`src/js_video.js`): an ELI5 whiteboard "video" on a topic (cards with that topic) or a typed concept (best-matching
+  cards, max 40). ONE `sample.json` call (modelTier default) writes the whole script: scenes of kind title / hypo / principle / steps /
+  case / roundup / compare / apply / recap, each with spoken `narration`, a short `heading`, `cards` ids and a `visual` spec using a fixed
+  icon list. The page draws each scene itself as SVG (seeded "sketchy" strokes via `Sketch`, icons in `VD_ICONS`, handwriting fonts
+  Caveat / Patrick Hand from Google Fonts) with CSS draw-on animation. Voice = the platform `tts` capability (natural Claude voice;
+  `speak()` one line per scene with id `s<i>`, `onLine` switches scenes; pause/resume/stop/setRate). No tts (Safari, mobile apps,
+  outside-org viewers) → captions with timed auto-advance; never the browser's robotic voice. Coverage check (free, local,
+  `vdCoverage`): every pool card must appear (scene `cards` id or name in text); missing ones get scenes built from the card text
+  (`auto`), placed before the recap; "X v Y" names not in the library are flagged (`warn`). Stored as `video/<id>` (whole script) or
+  browser key `lawRevisionApp.v1.videos`; in backups as `videos`. Replays cost nothing.
 - Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
   (hook `sessionModalClosed` in `closeModal`).

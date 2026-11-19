@@ -90,6 +90,7 @@
     loadLocalNotes();
     loadLocalMemory();
     loadLocalRn();
+    loadLocalVideos();
     state.loaded = true;
     setSync('ok');
     renderAll();
@@ -164,6 +165,7 @@
     startNotesCloud(db);
     startMemoryCloud(db);
     startRnCloud(db);
+    startVideoCloud(db);
     db.collection('src').onSnapshot(function (snap) {
       state.sources = snap.docs.map(function (d) { return sanitizeSourceMeta(d.data()); }).filter(Boolean)
         .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; });

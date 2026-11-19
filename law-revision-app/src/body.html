@@ -35,6 +35,7 @@
     <section>
       <div class="side-heading">Study tools</div>
       <div class="side-actions">
+        <button class="btn" id="vdBtn" type="button" title="ELI5 explainer videos with a tutor's voice">🎬 Explainer videos <span class="chip" id="vdCount">0</span></button>
         <button class="btn" id="progressBtn" type="button">📈 My progress &amp; suggestions</button>
         <button class="btn" id="verifyBtn" type="button">✓ Check cards against sources</button>
         <button class="btn" id="planBtn" type="button">📅 Exam dates &amp; study plan</button>
@@ -455,6 +456,20 @@
 </div>
 
 <div class="session-bar" id="sessionBar" hidden role="status" aria-live="polite"></div>
+
+<!-- ================================================================
+     MODAL: EXPLAINER VIDEOS
+     ================================================================ -->
+<div class="modal" id="vdModal" hidden role="dialog" aria-modal="true" aria-labelledby="vdTitleH">
+  <div class="modal-box xwide">
+    <div class="modal-head">
+      <h2 id="vdTitleH">Explainer videos</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="vdBody"></div>
+    <div class="modal-foot" id="vdFoot"></div>
+  </div>
+</div>
 
 <!-- ================================================================
      MODAL: REVISION NOTES (The Standard, as PDFs)

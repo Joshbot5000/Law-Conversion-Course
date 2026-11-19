@@ -142,6 +142,7 @@
     bindProgress();
     bindSession();
     bindRn();
+    bindVideo();
     $('#entryForm').addEventListener('click', function (ev) { var l = ev.target.closest('[data-focus]'); if (l) $('#' + l.getAttribute('data-focus')).focus(); });
     $('#fabQuickNote').addEventListener('click', function () { setFab(false); openLectureNotes({ newNote: true }); });
     $('#commentSave').addEventListener('click', saveComment);

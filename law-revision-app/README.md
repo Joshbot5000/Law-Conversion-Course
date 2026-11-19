@@ -4,7 +4,7 @@ A single-page revision app for the law conversion course: flashcards with spaced
 and quote, lecture notes with automatic topic detection, Word-style formatting on cards, adaptive multi-topic quizzes
 (optionally limited to chosen sources) with an end-of-quiz review and practice aimed at your mistakes, a saved
 mistakes log, a timed exam mode, Quick test (generate a principle / case / statute with Claude checking your answer,
-distinguish two cases, fill in the blank), printable revision posters (up to 4 landscape infographic pages, with a coverage check against your sources), a guided Today's session, long-term study memory with "Work on next"
+distinguish two cases, fill in the blank), printable revision posters (up to 4 landscape infographic pages, with a coverage check against your sources), ELI5 explainer videos (hand-drawn whiteboard scenes with a natural tutor's voice), a guided Today's session, long-term study memory with "Work on next"
 suggestions, a weekly summary and a progress view, mock exams, and study tools (check cards against sources,
 find duplicates, exam pacing).
 
