@@ -50,5 +50,10 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
 - Quick test (`src/js_flash.js`) modes: principle / case / statute flashcards (typed answers checked by Claude against the card only),
   distinguish two cases (same topic), fill in the blank (local check with typo tolerance). `fl.limit` caps a run (Today's session uses 5).
 - Weekly summary: `perf.w` / `perf.wPrev` = weekly snapshots of topic scores, rolled on the first visit of a week (`maybeWeeklyRoll`).
+- Revision notes (`src/js_revnotes.js`): the owner's "Standard" notes format (from their law-study-notes skill) written from chosen
+  sources in stages (plan per ~110k-char chunk → one call per sub-topic with only its pages → hooks → glossary → case glossary →
+  outcomes check), with NO flashcards (the owner said the app already makes those). Case names are checked against the sources and
+  flagged if not found. Stored as `rdoc/<id>` (meta) + `rdocpart/<id>_<n>` (JSON in parts); browser key `lawRevisionApp.v1.rdocs`.
+  PDFs are made on demand with pdfmake 0.2.10 (Roboto has no arrows/ticks: `pdfSafe` swaps them).
 - Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
   (hook `sessionModalClosed` in `closeModal`).

@@ -16,6 +16,7 @@
     notes: [],                       // lecture notes
     perf: { c: {}, s: [] },          // study memory: results per card and recent sessions
     mistakes: [],                    // quiz questions answered wrongly, until mastered
+    rdocs: [],                       // revision notes (list; each document is loaded when opened)
     commentFor: null,
     settings: {
       view: 'card', cram: false, sort: 'module', typeFilter: 'all', statusFilter: 'all',

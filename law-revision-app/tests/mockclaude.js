@@ -71,6 +71,36 @@
       out.push({ type: 'principle', name: 'Invented rule for testing', citation: 'Key authorities: Nobody v Nothing', topic: 'Testing', facts: '', ratio: 'A rule the text never states.', strategy: '', tags: ['test'], page: 1, quote: 'This sentence is not in the source at all.' });
       return JSON.stringify(out);
     }
+    if (text.indexOf('REVISION NOTES — ') !== -1) {
+      window.__mock.rn = (window.__mock.rn || 0) + 1;
+      var refs = []; var rr = /=== \[(S\d+:\d+)\] ===/g, mm; while ((mm = rr.exec(text))) refs.push(mm[1]);
+      var found = {}; var cr = /([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*) v ([A-Z][A-Za-z&'.]+(?: [A-Z][A-Za-z&'.]+)*)/g, cm;
+      while ((cm = cr.exec(text))) found[cm[0]] = true;
+      var caseNames = Object.keys(found).slice(0, 8);
+      if (text.indexOf('REVISION NOTES — PLAN') !== -1) return JSON.stringify({
+        title: 'Mock notes title', topicMap: ['Duty → Breach → Causation', 'Defences → Remedies'],
+        outcomes: /LEARNING OUTCOMES/.test(text) || window.__rnOutcomes ? ['Explain causation', 'Apply the but-for test'] : [],
+        sections: [{ title: 'Duty of care', pages: refs.slice(0, 1), principles: ['Neighbour principle', 'Incremental approach'] }, { title: 'Causation', pages: refs.slice(1, 2), principles: ['But-for test', 'Material contribution'] }],
+        hooks: [{ title: 'The but-for test', pages: refs.slice(1, 2) }],
+        terms: [{ term: 'Ratio decidendi', page: refs[0] }, { term: 'Novus actus interveniens', page: refs[1] || refs[0] }],
+        cases: caseNames.map(function (n) { return { name: n, page: refs[0] }; }).concat([{ name: 'Nobody v Nothing', page: refs[0] }])
+      });
+      if (text.indexOf('REVISION NOTES — SECTION') !== -1) {
+        if (window.__rnFailSection && text.indexOf('SECTION: Causation') !== -1) return 'not json';
+        return JSON.stringify({ entries: [
+          { principle: 'A manufacturer owes a duty to the ultimate consumer.', authority: caseNames[0] || 'Donoghue v Stevenson', eli5: 'Like a baker being careful for whoever eats the cake.', case: { name: caseNames[0] || 'Donoghue v Stevenson', citation: '[1932] AC 562', facts: 'A snail was said to be in a bottle.', decision: 'Duty owed.', ratio: 'Neighbour principle.', exam: 'Start every duty question here.' }, examAngle: 'Watch for a claimant who is not the buyer.', pros: ['Protects consumers'], cons: ['Wide liability'], added: false, unverified: false },
+          { principle: 'Courts develop duty incrementally.', authority: 'Robinson v Chief Constable of West Yorkshire', eli5: 'Small steps from decided cases.', case: null, examAngle: '', pros: [], cons: [], added: true, unverified: false }
+        ] });
+      }
+      if (text.indexOf('REVISION NOTES — MEMORY HOOKS') !== -1) return JSON.stringify({ hooks: [{ title: 'The but-for test', hook: 'BUT the snail: would it have happened BUT FOR the breach?', steps: ['Breach', 'Would the harm have happened anyway?'] }] });
+      if (text.indexOf('REVISION NOTES — PLAIN ENGLISH GLOSSARY') !== -1) return JSON.stringify({ terms: [{ term: 'Ratio decidendi', eli5: 'The reason for the decision.', significance: 'Binding on lower courts.' }, { term: 'Novus actus interveniens', eli5: 'A new act that breaks the chain.', significance: 'Can break causation.' }] });
+      if (text.indexOf('REVISION NOTES — CASE GLOSSARY') !== -1) {
+        var list = text.split('\n').filter(function (l) { return / v /.test(l) && l.indexOf(';') !== -1; })[0] || '';
+        return JSON.stringify({ cases: list.split(';').map(function (n) { n = n.trim(); return { name: n, citation: '', facts: 'Facts of ' + n + '.', ratio: 'Rule from ' + n + '.', supports: 'Duty of care', unverified: false }; }) });
+      }
+      if (text.indexOf('REVISION NOTES — LEARNING OUTCOMES') !== -1) return JSON.stringify({ outcomes: [{ outcome: 'Explain causation', sections: [2], note: 'Covered by the but-for test.', covered: true }, { outcome: 'Apply the but-for test', sections: [2], note: 'Worked through.', covered: true }] });
+      if (text.indexOf('REVISION NOTES — MERGE') !== -1) return JSON.stringify({ title: 'Merged notes', topicMap: ['Part one → Part two'] });
+    }
     if (text.indexOf('quick test answer') !== -1) {
       var pair = text.indexOf('DISTINGUISH') !== -1;
       var r = { verdict: 'partly', right: ['You identified the main rule.'], missed: ['You left out the material facts.'], wrong: [] };

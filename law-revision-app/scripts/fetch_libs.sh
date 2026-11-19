@@ -6,4 +6,7 @@ cd "$(dirname "$0")/.."
 mkdir -p libs/pdfjs-dist-3.11.174 libs/mammoth-1.6.0
 curl -sSL https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz | tar xz -C libs/pdfjs-dist-3.11.174 --strip-components=1
 curl -sSL https://registry.npmjs.org/mammoth/-/mammoth-1.6.0.tgz | tar xz -C libs/mammoth-1.6.0 --strip-components=1
+
+mkdir -p libs/pdfmake-0.2.10
+curl -sSL https://registry.npmjs.org/pdfmake/-/pdfmake-0.2.10.tgz | tar xz -C libs/pdfmake-0.2.10 --strip-components=1
 echo "Libraries saved in libs/"

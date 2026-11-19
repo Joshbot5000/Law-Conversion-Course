@@ -27,6 +27,7 @@
       <div class="side-heading">Your materials</div>
       <div class="side-actions">
         <button class="btn" id="sourcesBtn" type="button">📚 Sources <span class="chip" id="sourceCount">0</span></button>
+        <button class="btn" id="rnBtn" type="button" title="Your Standard revision notes, as PDFs">📄 Revision notes <span class="chip" id="rnCount">0</span></button>
         <button class="btn btn-ask" id="addNotesSideBtn" type="button">＋ Add notes or a chapter</button>
       </div>
     </section>
@@ -454,6 +455,20 @@
 </div>
 
 <div class="session-bar" id="sessionBar" hidden role="status" aria-live="polite"></div>
+
+<!-- ================================================================
+     MODAL: REVISION NOTES (The Standard, as PDFs)
+     ================================================================ -->
+<div class="modal" id="rnModal" hidden role="dialog" aria-modal="true" aria-labelledby="rnTitleH">
+  <div class="modal-box modal-wide">
+    <div class="modal-head">
+      <h2 id="rnTitleH">Revision notes</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="rnBody"></div>
+    <div class="modal-foot" id="rnFoot"></div>
+  </div>
+</div>
 
 <!-- ================================================================
      MODAL: QUICK TEST (generate a principle / case / statute)

@@ -949,4 +949,56 @@ body.ts-on .fab-wrap { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .pg-up { color: var(--case); }
 .pg-down { color: var(--danger); }
 @media (max-width: 640px) { .fl-gen, .fl-pair-back, .pg-movers { grid-template-columns: 1fr; } .session-bar { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Revision notes */
+.rn-list { display: flex; flex-direction: column; gap: 10px; }
+.rn-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.rn-item-text { min-width: 0; flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.rn-item-text b { font-size: 15px; }
+.rn-item-text span { font-size: 12.5px; color: var(--ink-2); }
+.rn-item-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rn-item-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.rn-srcs { margin-top: 12px; max-height: 340px; }
+.rn-note { font-size: 12.5px; margin: 10px 0 0; }
+.rn-steps { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.rn-steps li { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
+.rn-steps li.ok { color: var(--muted); }
+.rn-steps li.bad { color: var(--danger); }
+.rn-st { width: 18px; text-align: center; font-weight: 700; }
+.rn-steps li.ok .rn-st { color: var(--good); }
+.rn-steps .spinner { margin: 0; width: 12px; height: 12px; }
+.rn-doc { font-size: 14px; line-height: 1.55; }
+.rn-cover { border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 6px; }
+.rn-cover h2 { font-family: var(--serif); color: var(--accent); margin: 0; font-size: 24px; }
+.rn-cover p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.rn-h { font-size: 17px; color: var(--accent); margin: 22px 0 8px; font-family: var(--serif); }
+.rn-sub { font-size: 15px; margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+.rn-map { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; border-radius: 0 8px 8px 0; font-weight: 600; color: var(--accent); }
+.rn-entry { margin: 10px 0 14px; display: flex; flex-direction: column; gap: 5px; }
+.rn-principle { margin: 0; }
+.rn-auth { margin: 0; font-style: italic; color: var(--ink-2); }
+.rn-eli5 { background: var(--accent-soft); border-radius: 6px; padding: 7px 10px; }
+.rn-exam { background: var(--warn-soft); border-left: 3px solid var(--warn); border-radius: 0 6px 6px 0; padding: 7px 10px; }
+.rn-case { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: var(--surface-2); }
+.rn-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.rn-row span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.rn-row p { margin: 0; }
+.rn-pc .pro { color: var(--good); margin: 2px 0; }
+.rn-pc .con { color: var(--danger); margin: 2px 0; }
+.rn-hook { border: 1px solid var(--accent-line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.rn-hook p { margin: 4px 0; }
+.rn-hook ol { margin: 4px 0 0; padding-left: 20px; }
+.rn-flag { font-size: 12px; color: var(--warn); }
+.rn-flag.bad { color: var(--danger); }
+.rn-table { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13px; }
+.rn-tr { display: grid; grid-template-columns: 1fr 2fr 1.4fr; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--line); }
+.rn-cases .rn-tr { grid-template-columns: 1.2fr 1.5fr 1.4fr 1fr; }
+.rn-out .rn-tr { grid-template-columns: 2fr 1fr 1.6fr; }
+.rn-tr:nth-child(even) { background: var(--surface-2); }
+.rn-th { border-top: 0; background: var(--accent-soft) !important; font-weight: 700; font-size: 11.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+@media (max-width: 640px) {
+  .rn-tr, .rn-cases .rn-tr, .rn-out .rn-tr { grid-template-columns: 1fr; gap: 3px; }
+  .rn-th { display: none; }
+  .rn-row { grid-template-columns: 1fr; gap: 0; }
+}
 </style>
