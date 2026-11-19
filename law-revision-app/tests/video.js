@@ -121,16 +121,10 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await q.waitForSelector('#vdStage svg', { timeout: 20000 });
   ok(/Covers 4 of 4 cards/.test(await q.textContent('.vd-head')), 'nothing added when the script covers every card');
   ok(/isn't offered in this view/.test(await q.textContent('#vdCtl')) && /Chrome or Edge on a computer/.test(await q.textContent('#vdCtl')) && !(await q.$('#vdVoice')), 'no Claude voice here: says so clearly and where it works');
-  ok(await q.$('#vdDevice'), "offers this device's own voice instead");
+  ok(!(await q.$('#vdDevice')), 'never switches to the robotic device voice');
   await q.click('[data-vd="play"]');
   await q.waitForFunction(() => /^3 \/ 9$/.test(document.querySelector('#vdStage svg text:last-of-type').textContent), null, { timeout: 8000 });
   ok(await q.isVisible('#vdCap'), 'plays with captions, moving through the scenes on its own');
-  await q.click('[data-vd="stop"]').catch(() => {});
-  await q.check('#vdDevice'); await q.click('.vd-dot[data-i="0"]'); await q.click('[data-vd="play"]');
-  await q.waitForFunction(() => window.__said.length > 5, null, { timeout: 8000 });
-  ok(await q.evaluate(() => window.__said[0].startsWith('Hi!')), "with the device voice ticked, it reads the narration aloud, sentence by sentence");
-  await q.waitForFunction(() => /Play again/.test(document.querySelector('#vdCtl').textContent), null, { timeout: 15000 });
-  ok(/^9 \/ 9$/.test(await q.textContent('#vdStage svg text:last-of-type')), 'scenes follow the device voice to the end');
   ok(errs.length === 0, 'no page errors ' + errs.join(' | '));
   await b.close();
 })();

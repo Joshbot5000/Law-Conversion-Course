@@ -67,7 +67,7 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   icon list. The page draws each scene itself as SVG (seeded "sketchy" strokes via `Sketch`, icons in `VD_ICONS`, handwriting fonts
   Caveat / Patrick Hand from Google Fonts) with CSS draw-on animation. Voice = the platform `tts` capability (natural Claude voice;
   `speak()` one line per scene with id `s<i>`, `onLine` switches scenes; pause/resume/stop/setRate). No tts (Safari, mobile apps,
-  outside-org viewers, offline copy) → a clear note saying why and where it works, captions with timed auto-advance, and an opt-in "use this device's own voice" (speechSynthesis, sentence by sentence, best en-GB voice; never offered after the viewer turned Read aloud off, `ttsOff`). Coverage check (free, local,
+  outside-org viewers, offline copy) → a clear note saying why and where it works, captions with timed auto-advance. The owner explicitly does NOT want the device/browser voice: only the Claude voice, else captions. Coverage check (free, local,
   `vdCoverage`): every pool card must appear (scene `cards` id or name in text); missing ones get scenes built from the card text
   (`auto`), placed before the recap; "X v Y" names not in the library are flagged (`warn`). Stored as `video/<id>` (whole script) or
   browser key `lawRevisionApp.v1.videos`; in backups as `videos`. Replays cost nothing.

@@ -16,7 +16,7 @@
   var VD_MAX_CARDS = 40;
   var VD_KINDS = ['title', 'hypo', 'principle', 'steps', 'case', 'roundup', 'compare', 'apply', 'recap'];
   var VD_VOICES = { buttery: 'Warm', airy: 'Light', glassy: 'Clear', rounded: 'Soft' };
-  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, device: false, devTok: 0, voice: 'buttery', rate: 1, cc: true, unsub: [] };
+  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, voice: 'buttery', rate: 1, cc: true, unsub: [] };
   state.videos = [];
 
   /* ---- storage ---- */
@@ -512,7 +512,6 @@
       });
       return;
     }
-    if (vd.device && window.speechSynthesis) { vdDeviceSay(from); return; }
     // No voice here: captions, timed to roughly how long the words take to say.
     var tick = function () {
       if (!vd.playing || vd.paused) return;
@@ -534,41 +533,17 @@
   function vdVoiceNote() {
     if (vd.tts) return '🔊 <b>Tutor voice on.</b> Press Play and turn your sound up. Hear nothing? Check your device isn\'t muted, and that <i>Read aloud</i> is allowed in this app\'s Permissions menu (at the top of the page on claude.ai).';
     if (!vd.ttsReady) return '<span class="spinner"></span>Checking for the tutor voice…';
-    var dev = window.speechSynthesis && typeof window.SpeechSynthesisUtterance === 'function';
     var why = vd.ttsOff ? '🔇 <b>Reading aloud is turned off for this app.</b> To hear the tutor, turn <i>Read aloud</i> back on in the app\'s Permissions menu at the top of the page on claude.ai, then reopen the app.'
       : '🔇 <b>The Claude tutor voice isn\'t offered in this view.</b> It works when the app is opened on claude.ai in <b>Chrome or Edge on a computer</b>, or in the main window of the <b>Claude desktop app</b>. It isn\'t available in Safari, Firefox, the Claude phone apps, side panels, or the offline copy.';
-    if (vd.ttsOff || !dev) return why;
-    return why + '<br><label class="vd-dev"><input type="checkbox" id="vdDevice"' + (vd.device ? ' checked' : '') + '> Use this device\'s own voice instead <span class="muted">(less natural, but you get sound here)</span></label>';
-  }
-  // Fallback voice: the device's speech, sentence by sentence (long single utterances cut out in some browsers).
-  function vdBestVoice() {
-    var vs = (window.speechSynthesis.getVoices() || []).filter(function (v) { return /^en/i.test(v.lang); });
-    var score = function (v) { return (/en[-_]GB/i.test(v.lang) ? 4 : 0) + (/natural|neural|premium|enhanced|siri/i.test(v.name) ? 6 : 0) + (/google uk/i.test(v.name) ? 3 : 0) + (v.localService ? 0 : 1); };
-    return vs.sort(function (a, b) { return score(b) - score(a); })[0] || null;
-  }
-  function vdDeviceSay(from) {
-    var v = vd.cur, ss = window.speechSynthesis, tok = ++vd.devTok, voice = vdBestVoice();
-    ss.cancel();
-    v.scenes.slice(from).forEach(function (sc, k) {
-      var i = from + k, parts = sc.narration.match(/[^.!?]+[.!?]*\s*/g) || [sc.narration];
-      parts.forEach(function (txt, j) {
-        var u = new SpeechSynthesisUtterance(txt.trim());
-        if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-GB';
-        u.rate = vd.rate;
-        if (j === 0) u.onstart = function () { if (tok === vd.devTok && vd.playing && vd.scene !== i) vdShow(i); };
-        if (i === v.scenes.length - 1 && j === parts.length - 1) u.onend = function () { if (tok === vd.devTok && vd.playing) { vd.playing = false; vd.ended = true; renderVdControls(); } };
-        ss.speak(u);
-      });
-    });
+    return why + (vd.ttsOff ? '' : ' Here it plays with captions.');
   }
   function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
-  function vdStop() { stopVdTimer(); var was = vd.playing; vd.playing = false; vd.paused = false; if (was && vd.tts) vd.tts.stop().then(null, function () {}); if (vd.device && window.speechSynthesis) { vd.devTok++; window.speechSynthesis.cancel(); } if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdStop() { stopVdTimer(); var was = vd.playing; vd.playing = false; vd.paused = false; if (was && vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
   function vdPause() {
     if (!vd.playing) return;
     vd.paused = !vd.paused;
     $('#vdStage').classList.toggle('paused', vd.paused);
     if (vd.tts) (vd.paused ? vd.tts.pause() : vd.tts.resume()).then(null, function () {});
-    else if (vd.device && window.speechSynthesis) { if (vd.paused) window.speechSynthesis.pause(); else window.speechSynthesis.resume(); }
     else if (!vd.paused) { var keep = vd.scene; vd.playing = false; vd.scene = keep; vdPlay(keep); return; }
     else stopVdTimer();
     renderVdControls();
@@ -641,7 +616,7 @@
     }
   }
   function bindVideo() {
-    try { vd.device = localStorage.getItem('lawRevisionApp.v1.deviceVoice') === '1'; vd.ttsOff = localStorage.getItem('lawRevisionApp.v1.ttsOff') === '1'; } catch (e) { /* ignore */ }
+    try { vd.ttsOff = localStorage.getItem('lawRevisionApp.v1.ttsOff') === '1'; } catch (e) { /* ignore */ }
     $('#vdBtn').addEventListener('click', function () { openVideo(); });
     var m = $('#vdModal');
     m._onClose = function () { vdStop(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
@@ -649,7 +624,6 @@
     m.addEventListener('change', function (ev) {
       var t = ev.target;
       if (t.id === 'vdTopic') { vd.topic = t.value; renderVideo(); }
-      else if (t.id === 'vdDevice') { vdStop(); vd.device = t.checked; try { localStorage.setItem('lawRevisionApp.v1.deviceVoice', vd.device ? '1' : ''); } catch (e) { /* ignore */ } renderVdControls(); }
       else if (t.id === 'vdVoice') { vd.voice = t.value; if (vd.playing) vdPlay(vd.scene); }
       else if (t.id === 'vdRate') { vd.rate = +t.value || 1; if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
     });
