@@ -981,6 +981,7 @@ body.ts-on .fab-wrap { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .vd-svg { display: block; width: 100%; height: 100%; }
 .vd-stage { position: relative; cursor: pointer; }
 .vd-stage.idle::after { content: "▶"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 78px; height: 78px; border-radius: 50%; background: rgba(20, 22, 30, .55); color: #fff; font-size: 34px; display: grid; place-items: center; padding-left: 6px; box-sizing: border-box; pointer-events: none; }
+.vd-stage.waiting::before { content: "Preparing the voice…"; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(20, 22, 30, .7); color: #fff; font-size: 13px; padding: 5px 12px; border-radius: 999px; z-index: 2; pointer-events: none; }
 .vd-stage.paused::after { content: "❚❚"; padding-left: 0; font-size: 26px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 78px; height: 78px; border-radius: 50%; background: rgba(20, 22, 30, .55); color: #fff; display: grid; place-items: center; pointer-events: none; }
 .vd-svg { animation: vdIn .45s ease; }
 .vd-cam { transform-box: view-box; transform-origin: 640px 360px; animation: vdCam 45s linear forwards; }

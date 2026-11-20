@@ -74,5 +74,15 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   explicitly does NOT want the device/browser voice. Coverage check (free, local, `vdCoverage`): every card must appear — a case only
   counts if its name is said or shown; missing ones get scenes built from the card's facts/rule/exam use (`auto`), before the recap;
   "X v Y" names not in the library are flagged (`warn`). Stored as `video/<id>` or browser key `lawRevisionApp.v1.videos`; in backups.
+- Phone voice (`src/js_pvoice.js`): where the Claude `tts` voice isn't offered (iPhone, Safari, phone apps), the owner can switch on a
+  natural neural voice that runs ON THE DEVICE: Kokoro-82M int8 (Apache-2.0) via onnxruntime-web 1.20.1 (wasm, 1 thread) + phonemizer
+  (eSpeak NG) in a blob module worker. The artifact CSP only lets the page fetch from its OWN address (connect-src 'self' blob:), so the
+  model is published next to the page under `tts/` as files < 15 MB (`kokoro-int8-0..6.bin`, `ort-wasm-1.20.1.wasm`, three voice `.bin`,
+  `manifest.json` with the phoneme vocab) — built by `scripts/make_phone_voice.py` into `libs/phone-voice` (never committed; ~105 MB;
+  published in two Artifact publishes because one publish is capped at 64 MB; later page-only publishes keep them). The engine scripts
+  load from jsDelivr (script-src allows it); the wasm binary is handed over as `wasmBinary`. Download kept in Cache Storage; made audio
+  in IndexedDB `lr-phone-voice` per video/line/voice/pace; `pvPrepare` makes the whole video's voice in the background (priority from
+  the current scene). Voices: Emma / George (British), Heart (American). Test: `tests/pvoice.js` (serves the app on https with the
+  real CSP). The device's built-in voice is still never used.
 - Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
   (hook `sessionModalClosed` in `closeModal`).

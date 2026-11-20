@@ -17,7 +17,7 @@
   var VD_KINDS = ['title', 'hypo', 'principle', 'steps', 'case', 'roundup', 'compare', 'quiz', 'apply', 'recap'];
   var VD_VOICES = { buttery: 'Warm', airy: 'Light', glassy: 'Clear', rounded: 'Soft' };
   var VD_RATES = [[0.75, 'Slow'], [0.85, 'Tutor pace'], [1, 'Normal'], [1.15, 'Brisk']];
-  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, voice: 'buttery', rate: 0.85, style: 'whiteboard', view_style: '', cc: true, unsub: [] };
+  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, voice: 'buttery', pvOn: false, pvVoice: 'bf_emma', pvTok: 0, rate: 0.85, style: 'whiteboard', view_style: '', cc: true, unsub: [] };
   state.videos = [];
 
   /* ---- storage ---- */
@@ -293,6 +293,7 @@
       '<button type="button" class="btn btn-sm btn-ghost" data-vd="prev" aria-label="Previous scene">‹</button><button type="button" class="btn btn-sm btn-ghost" data-vd="next" aria-label="Next scene">›</button>' +
       '<span class="vd-dots">' + v.scenes.map(function (s, i) { return '<button type="button" class="vd-dot' + (i === vd.scene ? ' on' : '') + (s.auto ? ' auto' : '') + '" data-vd="go" data-i="' + i + '" title="' + esc((i + 1) + '. ' + (s.heading || s.kind)) + '"></button>'; }).join('') + '</span>' +
       '<span class="spacer"></span>' +
+      (!voiced && vd.pvOn && pv.state === 'ready' ? '<label class="vd-sel">Voice <select id="vdPVoice">' + Object.keys(PV_VOICES).map(function (k) { return '<option value="' + k + '"' + (k === vd.pvVoice ? ' selected' : '') + '>' + PV_VOICES[k] + '</option>'; }).join('') + '</select></label>' : '') +
       (voiced ? '<label class="vd-sel">Voice <select id="vdVoice">' + Object.keys(VD_VOICES).map(function (k) { return '<option value="' + k + '"' + (k === vd.voice ? ' selected' : '') + '>' + VD_VOICES[k] + '</option>'; }).join('') + '</select></label>' : '') +
       '<label class="vd-sel">Style <select id="vdStyle">' + VD_STYLE_ORDER.map(function (k) { return '<option value="' + k + '"' + (k === vdStyleKey() ? ' selected' : '') + '>' + VD_STYLES[k].label + '</option>'; }).join('') + '</select></label>' +
       '<label class="vd-sel">Pace <select id="vdRate">' + VD_RATES.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === vd.rate ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('') + '</select></label>' +
@@ -320,6 +321,7 @@
       });
       return;
     }
+    if (vd.pvOn && pv.state === 'ready') { vdPhonePlay(from); return; }
     // No voice here: captions, timed to roughly how long the words take to say.
     var tick = function () {
       if (!vd.playing || vd.paused) return;
@@ -343,23 +345,77 @@
     if (!vd.ttsReady) return '<span class="spinner"></span>Checking for the tutor voice…';
     var why = vd.ttsOff ? '🔇 <b>Reading aloud is turned off for this app.</b> To hear the tutor, turn <i>Read aloud</i> back on in the app\'s Permissions menu at the top of the page on claude.ai, then reopen the app.'
       : '🔇 <b>The Claude tutor voice isn\'t offered in this view.</b> It works when the app is opened on claude.ai in <b>Chrome or Edge on a computer</b>, or in the main window of the <b>Claude desktop app</b>. It isn\'t available in Safari, Firefox, the Claude phone apps, side panels, or the offline copy.';
-    return why + (vd.ttsOff ? '' : ' Here it plays with captions.');
+    if (vd.ttsOff || !pvAvailable()) return why + (vd.ttsOff ? '' : ' Here it plays with captions.');
+    if (pv.state === 'ready' && vd.pvOn) { setTimeout(function () { vdPrep(vd.playing ? vd.scene : 0); }, 0); return '🔊 <b>Phone voice on.</b> A natural voice made on this device. <span id="vdPrep"></span>'; }
+    if (pv.state === 'loading') return '<span class="spinner"></span>' + esc(pv.stepText || 'Getting the phone voice ready…') + ' <b>' + pv.pct + '%</b> <span class="muted">(about 105 MB, only the first time — Wi-Fi is best)</span>';
+    if (pv.state === 'error') return '⚠ The phone voice couldn\'t start here: ' + esc(pv.err) + ' <button type="button" class="btn btn-sm" data-vd="pvon">Try again</button>';
+    return '🔇 The Claude tutor voice isn\'t offered on this device (it only works on a computer). <button type="button" class="btn btn-sm btn-primary" data-vd="pvon">🔊 Use the phone voice</button> <span class="muted">A natural-sounding voice that runs on this device. It downloads about 105 MB once (Wi-Fi is best).</span>';
+  }
+  function vdPvOn() {
+    vd.pvOn = true; vdPref('pv', true);
+    pv.onMade = vdPrepShow;
+    return pvStart(function (t) { pv.stepText = t; renderVdControls(); }).then(function () { renderVdControls(); }, function () { renderVdControls(); });
+  }
+  // Prepare the voice for the whole video in the background (from scene `from` on, then the rest), and show how far it has got.
+  function vdPrep(from) {
+    var v = vd.cur; if (!v || !vd.pvOn || pv.state !== 'ready' || vd.tts) return;
+    var voice = PV_VOICES[vd.pvVoice] ? vd.pvVoice : 'bf_emma', speed = vd.rate;
+    var all = vdLines(v, 0), order = all.filter(function (l) { return +/^s(\d+)/.exec(l.id)[1] >= (from || 0); }).concat(all.filter(function (l) { return +/^s(\d+)/.exec(l.id)[1] < (from || 0); }));
+    var items = order.map(function (l) { return { key: v.id + '|' + l.id + '|' + voice + '|' + speed + '|' + vdHash(l.text), text: l.text, voice: voice, speed: speed }; });
+    vd.prepKeys = items.map(function (it) { return it.key; });
+    pvPrepare(items);
+    vdPrepShow();
+  }
+  function vdPrepShow() {
+    var el = $('#vdPrep'); if (!el || !vd.prepKeys) return;
+    var n = vd.prepKeys.length, done = vd.prepKeys.filter(function (k) { return pv.mem[k]; }).length;
+    el.innerHTML = done >= n ? '✓ Voice ready for the whole video' : '<span class="spinner"></span>Preparing the voice for this video: <b>' + Math.round(done / Math.max(1, n) * 100) + '%</b> <span class="muted">(you can press Play now)</span>';
+  }
+  function vdHash(t) { var h = 2166136261; for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+  // Play with the phone voice: make each breath of narration in order (ahead of where you are) and play it as it's ready.
+  function vdPhonePlay(from) {
+    var v = vd.cur, tok = ++vd.pvTok, lines = vdLines(v, from), voice = PV_VOICES[vd.pvVoice] ? vd.pvVoice : 'bf_emma', speed = vd.rate;
+    pvCtx().resume();
+    vdPrep(from);
+    var key = function (l) { return v.id + '|' + l.id + '|' + voice + '|' + speed + '|' + vdHash(l.text); };
+    var made = { then: null };
+    made = lines.map(function (l) { return { then: function (a, b) { return pvSay(key(l), l.text, voice, speed, true).then(a, b); } }; });
+    var held = function () { return new Promise(function (r) { (function wait() { if (tok !== vd.pvTok || !vd.paused) r(); else setTimeout(wait, 200); })(); }); };
+    var waiting = function (on) { var st = $('#vdStage'); if (st) st.classList.toggle('waiting', on); };
+    var playAt = function (i) {
+      if (tok !== vd.pvTok) return;
+      if (i >= lines.length) { vd.playing = false; vd.ended = true; renderVdControls(); return; }
+      var m = /^s(\d+)_(\d+)$/.exec(lines[i].id);
+      if (m && m[2] === '0' && +m[1] !== vd.scene) vdShow(+m[1]);
+      var t0 = setTimeout(function () { waiting(true); }, 250);
+      made[i].then(function (audio) {
+        clearTimeout(t0); waiting(false);
+        if (tok !== vd.pvTok) return;
+        return held().then(function () { if (tok !== vd.pvTok) return; return pvPlay(audio).then(function () { if (tok !== vd.pvTok) return; setTimeout(function () { playAt(i + 1); }, 380); }); });
+      }, function (err) {
+        clearTimeout(t0); waiting(false);
+        if (tok !== vd.pvTok || (err && err.code === 'stopped')) return;
+        vd.playing = false; renderVdControls(); toast('The phone voice hit a problem: ' + ((err && err.message) || 'unknown') + '. Press Play to try again.', { type: 'error', timeout: 7000 });
+      });
+    };
+    playAt(0);
   }
   function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
-  function vdStop() { stopVdTimer(); vd.playing = false; vd.paused = false; if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdStop(leaving) { stopVdTimer(); vd.playing = false; vd.paused = false; vd.pvTok = (vd.pvTok || 0) + 1; pvHalt(); if (leaving) { pvDrop(); vd.prepKeys = null; } if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
   function vdToggle() { if (!vd.cur) return; if (vd.playing) vdPause(); else vdPlay(vd.ended ? 0 : vd.scene); }
   function vdPause() {
     if (!vd.playing) return;
     vd.paused = !vd.paused;
     $('#vdStage').classList.toggle('paused', vd.paused);
     if (vd.tts) (vd.paused ? vd.tts.pause() : vd.tts.resume()).then(null, function () {});
+    else if (vd.pvOn && pv.state === 'ready') { if (pv.ctx) { if (vd.paused) pv.ctx.suspend(); else pv.ctx.resume(); } }
     else if (!vd.paused) { var keep = vd.scene; vd.playing = false; vd.scene = keep; vdPlay(keep); return; }
     else stopVdTimer();
     renderVdControls();
   }
 
   /* ---- the window ---- */
-  function openVideo() { fontsOnce(); vdLoadTts(); if (vd.view !== 'gen' || !vd.job) vd.view = vd.cur && vd.view === 'play' ? 'play' : 'list'; renderVideo(); openModal($('#vdModal')); }
+  function openVideo() { fontsOnce(); vdLoadTts().then(function (t) { if (!t && vd.pvOn && pvAvailable() && pv.state === 'off') vdPvOn(); }); if (vd.view !== 'gen' || !vd.job) vd.view = vd.cur && vd.view === 'play' ? 'play' : 'list'; renderVideo(); openModal($('#vdModal')); }
   function renderVideo() {
     var body = $('#vdBody'), foot = $('#vdFoot');
     if (vd.view === 'gen') {
@@ -404,14 +460,15 @@
   function videoAction(a, el) {
     var id = el && el.getAttribute('data-id');
     if (a === 'new') { vdStop(); vd.view = 'new'; renderVideo(); }
-    else if (a === 'list') { vdStop(); vd.view = 'list'; renderVideo(); }
+    else if (a === 'list') { vdStop(true); vd.view = 'list'; renderVideo(); }
     else if (a === 'mode') { vd.mode = el.getAttribute('data-m'); renderVideo(); }
     else if (a === 'len') { vd.length = el.getAttribute('data-l'); renderVideo(); }
     else if (a === 'sty') { vd.style = el.getAttribute('data-s'); vdPref('style', vd.style); renderVideo(); }
     else if (a === 'make') startVideo();
     else if (a === 'cancel') { if (vd.job) vd.job.ctl.abort(); vd.job = null; vd.view = 'new'; renderVideo(); }
-    else if (a === 'open') { vdStop(); var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
+    else if (a === 'open') { vdStop(true); var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
     else if (a === 'play') vdPlay(vd.ended ? 0 : vd.scene);
+    else if (a === 'pvon') vdPvOn();
     else if (a === 'pause') vdPause();
     else if (a === 'stop') vdStop();
     else if (a === 'prev' || a === 'next' || a === 'go') {
@@ -428,11 +485,11 @@
   }
   function vdPref(k, val) { try { var p = JSON.parse(localStorage.getItem('lawRevisionApp.v1.videoPrefs') || '{}'); p[k] = val; localStorage.setItem('lawRevisionApp.v1.videoPrefs', JSON.stringify(p)); } catch (e) { /* ignore */ } }
   function bindVideo() {
-    try { var vp = JSON.parse(localStorage.getItem('lawRevisionApp.v1.videoPrefs') || '{}'); if (VD_RATES.some(function (r) { return r[0] === vp.rate; })) vd.rate = vp.rate; if (VD_STYLES[vp.style]) vd.style = vp.style; } catch (e) { /* ignore */ }
+    try { var vp = JSON.parse(localStorage.getItem('lawRevisionApp.v1.videoPrefs') || '{}'); if (VD_RATES.some(function (r) { return r[0] === vp.rate; })) vd.rate = vp.rate; if (VD_STYLES[vp.style]) vd.style = vp.style; vd.pvOn = vp.pv === true; vd.pvVoice = PV_VOICES[vp.pvVoice] ? vp.pvVoice : 'bf_emma'; } catch (e) { /* ignore */ }
     try { vd.ttsOff = localStorage.getItem('lawRevisionApp.v1.ttsOff') === '1'; } catch (e) { /* ignore */ }
     $('#vdBtn').addEventListener('click', function () { openVideo(); });
     var m = $('#vdModal');
-    m._onClose = function () { vdStop(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
+    m._onClose = function () { vdStop(true); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
     m.addEventListener('click', function (ev) { var b = ev.target.closest('[data-vd]'); if (b) videoAction(b.getAttribute('data-vd'), b); else if (ev.target.closest('#vdStage')) vdToggle(); });
     document.addEventListener('keydown', function (ev) {
       if ((ev.key === ' ' || ev.key === 'k') && !m.hidden && topModal() === m && vd.view === 'play' && !(ev.target.closest && ev.target.closest('input, select, textarea, button, [contenteditable]'))) { ev.preventDefault(); vdToggle(); }
@@ -442,8 +499,9 @@
     m.addEventListener('change', function (ev) {
       var t = ev.target;
       if (t.id === 'vdTopic') { vd.topic = t.value; renderVideo(); }
+      else if (t.id === 'vdPVoice') { vd.pvVoice = t.value; vdPref('pvVoice', t.value); if (vd.playing) vdPlay(vd.scene); }
       else if (t.id === 'vdVoice') { vd.voice = t.value; if (vd.playing) vdPlay(vd.scene); }
-      else if (t.id === 'vdRate') { vd.rate = +t.value || 0.85; vdPref('rate', vd.rate); if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
+      else if (t.id === 'vdRate') { vd.rate = +t.value || 0.85; vdPref('rate', vd.rate); if (!vd.tts && vd.pvOn && vd.playing) vdPlay(vd.scene); if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
       else if (t.id === 'vdStyle') { vd.view_style = t.value; vdPref('style', t.value); vdShow(vd.scene); }
     });
     var deb = null;
