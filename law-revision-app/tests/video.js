@@ -10,7 +10,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await ctx.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());
   await ctx.addInitScript({ path: path.join(T, 'sample_seed.js') });
   await ctx.addInitScript({ path: path.join(T, 'mockclaude.js') });
-  const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('crash', () => console.log('   PAGE CRASHED'));
   await page.goto('file://' + path.join(T, 'online_wrapped.html'));
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('lawRevisionApp.migrated', '1'); }); await page.reload();
   await page.waitForFunction(n => document.querySelector('#statTotal').textContent === String(n), N);
@@ -23,6 +23,8 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok((await page.textContent('#vdBody')).includes('No videos yet'), 'empty to start with');
   await page.click('[data-vd="new"]');
   ok(await page.isDisabled('[data-vd="make"]'), 'Make video waits for a topic');
+  ok((await page.$$('.vd-sty')).length === 6, 'six styles to choose from');
+  await page.click('.vd-sty[data-s="papercraft"]');
   await page.selectOption('#vdTopic', 'contract|Promissory Estoppel');
   const poolTxt = await page.textContent('#vdPool');
   ok(/Made from 4 cards/.test(poolTxt) && /Combe v Combe/.test(poolTxt), 'shows which of your cards it will use: ' + poolTxt.slice(0, 60));
@@ -31,21 +33,25 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   const ps = await calls();
   ok(ps.length === 1, 'ONE Claude request for the whole video');
   const p = ps[0];
-  ok(/Cover EVERY card/.test(p) && /Never invent a case/.test(p) && /clearly made up/.test(p) && /tiny story/.test(p), 'prompt: only your cards, every card, cases as stories, the example clearly made up');
-  ok(/friendly, engaging law tutor/.test(p) && /ELI5/.test(p) && /written exactly as spoken|exactly as spoken/.test(p), 'prompt: warm human tutor voice, written to be spoken');
-  ok(/Combe v Combe/.test(p) && /quick refresher, 6-10 scenes/.test(p), 'cards and length are in the prompt');
+  ok(/Cover EVERY card/.test(p) && /Never invent a case/.test(p) && /clearly made up/.test(p) && /proper little story/.test(p) && /say every case.s name aloud/.test(p), 'prompt: only your cards, every card, cases as full stories, the example clearly made up');
+  ok(/ELI5 analogy/.test(p) && /why it exists or why it matters/.test(p) && /when it applies and when it does not/.test(p), 'prompt: every principle explained in layers (rule, analogy, why, when, sum-up)');
+  ok(/Calm and unhurried/.test(p) && /warm, patient, encouraging/.test(p) && /"quiz" check-in/.test(p), 'prompt: calm, warm tutor with a quiz check-in');
+  ok(/favourite law tutor/.test(p) && /write for the ear/.test(p), 'prompt: warm human tutor voice, written to be spoken');
+  ok(/Combe v Combe/.test(p) && /LENGTH: refresher/.test(p), 'cards and length are in the prompt');
   const call = await page.evaluate(() => window.__mock.calls.find(c => typeof c.input === 'string' && c.input.includes('EXPLAINER')).opts);
   ok(call.modelTier === 'default', 'uses the standard model tier (not the most expensive)');
 
+  ok(await page.$('#vdStage.vd-st-papercraft'), 'the video opens in the style you chose');
+  await page.selectOption('#vdStyle', 'whiteboard');
   // 2. Coverage and accuracy checks
   const head = await page.textContent('.vd-head');
   console.log('   ' + head.replace(/\s+/g, ' ').trim());
   ok(/Covers 3 \+ 1 of 4 cards/.test(head) && /1 added by the coverage check/.test(head), 'the card the script left out was added by the coverage check');
   ok(/1 to check/.test(head) && !/2 to check/.test(head), 'a case not in your cards is counted for you to check');
   const v = await page.evaluate(() => { const st = window.__mock.store; const k = Object.keys(st).find(k => k.startsWith('video/')); return st[k]; });
-  ok(v && v.scenes.length === 10 && v.scenes.some(s => s.auto && s.kind !== 'recap') && v.scenes[v.scenes.length - 1].kind === 'recap', 'saved to your claude.ai account; the added scene goes before the recap');
+  ok(v && v.scenes.length === 11 && v.scenes.some(s => s.auto && s.kind !== 'recap') && v.scenes[v.scenes.length - 1].kind === 'recap', 'saved to your claude.ai account; the added scene goes before the recap');
   const auto = v.scenes.find(s => s.auto);
-  ok(/The rule:/.test(auto.narration) || /One more rule/.test(auto.narration), 'the added scene is built from your card: ' + auto.narration.slice(0, 70));
+  ok(/the rule it gives us/.test(auto.narration) || /One more rule/.test(auto.narration), 'the added scene is built from your card: ' + auto.narration.slice(0, 70));
   ok(v.scenes.some(s => s.warn && s.warn.includes('Invented v Nobody')), 'the invented case is flagged on its scene');
 
   // 3. The drawing
@@ -59,25 +65,42 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('[data-vd="play"]');
   await page.waitForFunction(() => window.__mock.tts && window.__mock.tts.length === 1);
   const sp = await page.evaluate(() => window.__mock.tts[0]);
-  ok(sp.lines.length === 10 && sp.lines[0].id === 's0' && sp.lines.every(l => l.len <= 2000 && l.voice === 'buttery'), 'one reading, a line per scene, in a natural Claude voice');
-  await page.waitForFunction(() => /^3 \/ 10$/.test(document.querySelector('#vdStage svg text:last-of-type').textContent), null, { timeout: 5000 });
+  ok(sp.lines.length >= 11 && sp.lines[0].id === 's0_0' && [...Array(11).keys()].every(i => sp.lines.some(l => l.id === 's' + i + '_0')) && sp.lines.every(l => l.len <= 300 && l.voice === 'buttery'), 'one reading in a natural Claude voice, each scene in short breaths (' + sp.lines.length + ' lines)');
+  ok(sp.opts.rate === 0.85, 'starts at a calm tutor pace (0.85)');
+  await page.waitForFunction(() => /^3 \/ 11$/.test(document.querySelector('#vdStage .vd-count').textContent), null, { timeout: 8000 });
   ok(true, 'scenes change as the voice reaches each one');
   await page.click('[data-vd="pause"]');
   ok(await page.$('#vdStage.paused') && (await page.textContent('#vdCtl')).includes('Resume'), 'pause holds the voice and the drawing');
-  const atPause = await page.textContent('#vdStage svg text:last-of-type'); await page.waitForTimeout(900);
-  ok(atPause === await page.textContent('#vdStage svg text:last-of-type'), 'nothing moves while paused');
+  const atPause = await page.textContent('#vdStage .vd-count'); await page.waitForTimeout(900);
+  ok(atPause === await page.textContent('#vdStage .vd-count'), 'nothing moves while paused');
   await page.click('[data-vd="pause"]');
   await page.selectOption('#vdRate', '1.15');
   ok(await page.evaluate(() => window.__mock.rate === 1.15), 'speed control changes the pace');
   await page.click('.vd-dot[data-i="7"]');
   await page.waitForFunction(() => window.__mock.tts.length === 2);
-  ok(await page.evaluate(() => window.__mock.tts[1].lines[0].id === 's7' && window.__mock.tts[1].lines.length === 3), 'clicking a scene plays from there');
-  for (const i of [1, 2, 3, 4, 5, 6, 7, 8]) { // screenshots of each kind of scene, for checking the look
-    await page.click('[data-vd="stop"]').catch(() => {}); await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => window.__mock.tts[1].lines[0].id === 's7_0' && window.__mock.tts[1].lines.length >= 4), 'clicking a scene plays from there');
+  for (const i of [1, 2, 3, 4, 5, 6, 7, 8, 9]) { // screenshots of each kind of scene, for checking the look
+    await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {}); await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(150);
     await page.evaluate(() => document.getAnimations().forEach(a => a.finish()));
     await page.locator('#vdStage').screenshot({ path: path.join(T, 'vd_scene' + i + '.png') });
   }
-  await page.click('[data-vd="stop"]').catch(() => {});
+  // 4b. Styles: any style, switched while watching, at no cost
+  const before = (await calls()).length;
+  for (const st of ['watercolour', 'papercraft', 'anime', 'retro', 'chalkboard', 'whiteboard']) {
+    await page.click('[data-vd="stop"]', { timeout: 2000 }).catch(() => {});
+    await page.selectOption('#vdStyle', st);
+    for (const i of [1, 3, 8]) {
+      await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(80);
+      await page.evaluate(() => document.getAnimations().forEach(a => a.finish()));
+      await page.locator('#vdStage').screenshot({ path: path.join(T, 'vd_' + st + i + '.png') });
+    }
+  }
+  const html = await page.evaluate(() => { const out = {}; for (const st of ['anime', 'retro', 'watercolour', 'papercraft', 'chalkboard']) { const sel = document.querySelector('#vdStyle'); sel.value = st; sel.dispatchEvent(new Event('change', { bubbles: true })); out[st] = document.querySelector('#vdStage').innerHTML; } return out; });
+  ok(/url\(#vdSky\)/.test(html.anime) && /url\(#vdHt\d\)/.test(html.retro) && /url\(#vdWash\)/.test(html.watercolour) && /url\(#vdSh\)/.test(html.papercraft) && /url\(#vdChalk\)/.test(html.chalkboard), 'six styles: whiteboard, watercolour, papercraft, anime, retro print, chalkboard');
+  ok((await calls()).length === before, 'switching style costs nothing');
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('lawRevisionApp.v1.videoPrefs')).style === 'chalkboard'), 'remembers your style');
+  await page.selectOption('#vdStyle', 'whiteboard');
+  await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
   await page.waitForFunction(() => !/Pause/.test(document.querySelector('#vdCtl').textContent));
   ok(true, 'stop ends the reading');
   ok((await page.textContent('#vdCap')).length > 10, 'captions show the words too');
@@ -123,7 +146,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(/isn't offered in this view/.test(await q.textContent('#vdCtl')) && /Chrome or Edge on a computer/.test(await q.textContent('#vdCtl')) && !(await q.$('#vdVoice')), 'no Claude voice here: says so clearly and where it works');
   ok(!(await q.$('#vdDevice')), 'never switches to the robotic device voice');
   await q.click('[data-vd="play"]');
-  await q.waitForFunction(() => /^3 \/ 9$/.test(document.querySelector('#vdStage svg text:last-of-type').textContent), null, { timeout: 8000 });
+  await q.waitForFunction(() => /^3 \/ 10$/.test(document.querySelector('#vdStage .vd-count').textContent), null, { timeout: 8000 });
   ok(await q.isVisible('#vdCap'), 'plays with captions, moving through the scenes on its own');
   ok(errs.length === 0, 'no page errors ' + errs.join(' | '));
   await b.close();

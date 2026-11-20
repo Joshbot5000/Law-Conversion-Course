@@ -61,15 +61,18 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   its priority, source page and where it is. PDFs are drawn with pdfmake; each page is shrunk/grown to fit exactly one page
   (`psFit`, binary search over `PS_SCALES`), and shown in the app via pdf.js. Stored as `rdoc` (`kind: 'poster'`) + `rdocpart`.
   Older long-form notes (v1, no kind) still list under "Older long-form notes" and open/download with the old code.
-- Explainer videos (`src/js_video.js`): an ELI5 whiteboard "video" on a topic (cards with that topic) or a typed concept (best-matching
-  cards, max 40). ONE `sample.json` call (modelTier default) writes the whole script: scenes of kind title / hypo / principle / steps /
-  case / roundup / compare / apply / recap, each with spoken `narration`, a short `heading`, `cards` ids and a `visual` spec using a fixed
-  icon list. The page draws each scene itself as SVG (seeded "sketchy" strokes via `Sketch`, icons in `VD_ICONS`, handwriting fonts
-  Caveat / Patrick Hand from Google Fonts) with CSS draw-on animation. Voice = the platform `tts` capability (natural Claude voice;
-  `speak()` one line per scene with id `s<i>`, `onLine` switches scenes; pause/resume/stop/setRate). No tts (Safari, mobile apps,
-  outside-org viewers, offline copy) → a clear note saying why and where it works, captions with timed auto-advance. The owner explicitly does NOT want the device/browser voice: only the Claude voice, else captions. Coverage check (free, local,
-  `vdCoverage`): every pool card must appear (scene `cards` id or name in text); missing ones get scenes built from the card text
-  (`auto`), placed before the recap; "X v Y" names not in the library are flagged (`warn`). Stored as `video/<id>` (whole script) or
-  browser key `lawRevisionApp.v1.videos`; in backups as `videos`. Replays cost nothing.
+- Explainer videos (`src/js_video.js` player/script/storage, `src/js_vdart.js` drawing): an ELI5 animated "video" on a topic (cards with
+  that topic) or a typed concept (best-matching cards, max 40). ONE `sample.json` call (modelTier default) writes the whole script:
+  scenes of kind title / hypo / principle / steps / case / roundup / compare / quiz / apply / recap, each with spoken `narration`, a short
+  `heading`, `cards` ids and a `visual` spec (fixed icon list; characters carry a `mood`). The prompt asks for a calm, warm tutor
+  (signposting, check-ins), every principle in layers (rule, analogy, why, when, sum-up) and every case as a full story; Refresher vs
+  Full lesson (adds quiz check-ins). Art is drawn by the page as SVG in six styles (`VD_STYLES`: whiteboard, watercolour, papercraft,
+  anime (chibi characters), retro print (halftone + misregistration), chalkboard), switchable while watching for free; style + pace are
+  remembered in localStorage `lawRevisionApp.v1.videoPrefs`. Voice = the platform `tts` capability ONLY (natural Claude voice); each
+  scene is spoken in short "breaths" (`vdChunks`, ≤260 chars, line ids `s<i>_<j>`; `onLine` on `_0` switches scene), default pace 0.85.
+  No tts (Safari, mobile apps, outside-org viewers, offline copy) → a clear note and captions with timed auto-advance. The owner
+  explicitly does NOT want the device/browser voice. Coverage check (free, local, `vdCoverage`): every card must appear — a case only
+  counts if its name is said or shown; missing ones get scenes built from the card's facts/rule/exam use (`auto`), before the recap;
+  "X v Y" names not in the library are flagged (`warn`). Stored as `video/<id>` or browser key `lawRevisionApp.v1.videos`; in backups.
 - Today's session (`src/js_session.js`): reviews → topic quiz → mistakes → quick test; closing a step's window ends that step
   (hook `sessionModalClosed` in `closeModal`).

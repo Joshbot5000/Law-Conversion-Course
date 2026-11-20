@@ -979,16 +979,30 @@ body.ts-on .fab-wrap { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .vd-cov { color: var(--good); font-weight: 600; } .vd-bad { color: var(--danger); }
 .vd-stage { margin-top: 10px; aspect-ratio: 16 / 9; width: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fffdf7; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
 .vd-svg { display: block; width: 100%; height: 100%; }
-.vd-ink { stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: vdDraw .9s ease-in-out forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
-.vd-text { font-family: 'Patrick Hand', 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive; opacity: 0; clip-path: inset(-20% 100% -20% 0); animation: vdWrite .9s ease-out forwards; animation-delay: calc(var(--d) * var(--step, .5s) + .15s); }
-.vd-title { font-family: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive; font-weight: 700; }
+.vd-svg { animation: vdIn .45s ease; }
+.vd-cam { transform-box: view-box; transform-origin: 640px 360px; animation: vdCam 45s linear forwards; }
+.vd-ink { stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: vdDraw 1s ease-in-out forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
+.vd-text { opacity: 0; clip-path: inset(-20% 100% -20% 0); animation: vdWrite 1s ease-out forwards; animation-delay: calc(var(--d) * var(--step, .5s) + .15s); }
 .vd-plain { font-family: 'Patrick Hand', cursive; }
-.vd-mark { opacity: .75; transform-box: fill-box; transform-origin: left center; transform: scaleX(0); animation: vdMark .5s ease-out forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
+.vd-mark { opacity: .8; transform-box: fill-box; transform-origin: left center; transform: scaleX(0); animation: vdMark .5s ease-out forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
+.vd-fade { opacity: 0; animation: vdFade .9s ease-out forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
+.vd-pop { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.6); animation: vdPop .55s cubic-bezier(.3, 1.6, .5, 1) forwards; animation-delay: calc(var(--d) * var(--step, .5s)); }
+.vd-late { animation-delay: var(--late, 6s) !important; }
 @keyframes vdDraw { to { stroke-dashoffset: 0; } }
 @keyframes vdWrite { 0% { opacity: 1; } to { opacity: 1; clip-path: inset(-20% 0 -20% 0); } }
 @keyframes vdMark { to { transform: scaleX(1); } }
+@keyframes vdFade { to { opacity: 1; } }
+@keyframes vdPop { to { opacity: 1; transform: none; } }
+@keyframes vdCam { from { transform: scale(1); } to { transform: scale(1.04); } }
+@keyframes vdIn { from { opacity: 0; } to { opacity: 1; } }
 .vd-stage.paused * { animation-play-state: paused !important; }
-@media (prefers-reduced-motion: reduce) { .vd-ink, .vd-text, .vd-mark { animation-duration: .01s; } }
+@media (prefers-reduced-motion: reduce) { .vd-ink, .vd-text, .vd-mark, .vd-fade, .vd-pop { animation-duration: .01s; } .vd-cam { animation: none; } }
+.vd-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.vd-sty { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 5px; align-items: stretch; font-size: 12.5px; color: var(--ink-2); }
+.vd-sty i { display: flex; gap: 4px; align-items: center; justify-content: center; height: 40px; border-radius: 6px; border: 1px solid rgba(0,0,0,.08); }
+.vd-sty b { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.vd-sty.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--ink); font-weight: 600; }
+.vd-stage.vd-st-chalkboard { background: #22382d; }
 .vd-ctl { margin-top: 8px; } .vd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .vd-dots { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: 6px; }
 .vd-dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--muted); background: none; padding: 0; cursor: pointer; }
