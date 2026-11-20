@@ -72,7 +72,13 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   scene is spoken in short "breaths" (`vdChunks`, ≤260 chars, line ids `s<i>_<j>`; `onLine` on `_0` switches scene), default pace 0.85.
   The voice is FED A SCENE OR TWO AT A TIME (`speak` then `add`, topped up by `vd.ttsFeed` as scenes start): one whole long video in
   a single call exceeds the voice allowance and is refused whole ("voice stopped unexpectedly"). Any other voice failure falls back
-  to captions (`vdCaptionsFrom`). Length budgets in the prompt: Refresher 550-750 words total (~4-5 min), Full lesson 1,050-1,350 (≤10 min).
+  to captions (`vdCaptionsFrom`). Length budgets in the prompt (quiz scenes NOT counted): Refresher 550-750 words (~4-5 min),
+  Full lesson 1,250-1,550 (≤12 min). `vdTeachSecs` measures the script at the 0.85 pace; if it's over `vdLimit` (12 / 6 min) ONE
+  follow-up request (`vdShortenPrompt`, "EXPLAINER VIDEO SHORTEN") tightens it, keeping card ids, case names and quiz scenes.
+  Quiz check-ins (Refresher 1, Full lesson 2-3) are INTERACTIVE: `visual` = {question, options, answer (index), explain}, applying the
+  law to the made-up example. Playback stops after the next quiz scene (`vd.stopAt`, `vdSegmentEnd`), `vdAsk` shows the options
+  under the picture, marks the answer, reads `explain` aloud, and Continue plays on. Ignore tts idle reasons 'replaced'/'stopped'
+  (the app's own); never use a time-based guard for that (it swallowed real "completed" events).
   No tts (Safari, mobile apps, outside-org viewers, offline copy) → a clear note and captions with timed auto-advance. The owner
   explicitly does NOT want the device/browser voice. Coverage check (free, local, `vdCoverage`): every card must appear — a case only
   counts if its name is said or shown; missing ones get scenes built from the card's facts/rule/exam use (`auto`), before the recap;

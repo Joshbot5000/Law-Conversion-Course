@@ -404,9 +404,9 @@
       S.icon('person', 90, 500, 170, { color: pc(2), mood: 'thinking', at: at() });
       tx('?', 1150, 260, { size: 150, anchor: 'middle', title: true, color: pc(0), at: at() });
       tx(V.question, 640, 330, { size: 42, chars: 36, anchor: 'middle', mid: true, at: at() });
-      tx('Pause and think…', 1150, 360, { size: 28, anchor: 'middle', color: T.sub, at: at() });
-      S.rect(380, 560, 840, 120, { color: '#2a8a52', fill: '#2a8a52', light: 0.82, at: 'late' });
-      tx(V.answer, 800, 620, { size: 34, chars: 46, anchor: 'middle', mid: true, at: 'late' });
+      tx('Your turn!', 1150, 360, { size: 30, anchor: 'middle', color: T.sub, at: at() });
+      if (V.options && V.options.length) V.options.forEach(function (o, i) { var x = 330 + (i % 2) * 450, y = 560 + Math.floor(i / 2) * 70; S.ellipse(x, y - 10, 20, 20, { color: pc(i), fill: pc(i), light: 0.5, once: true, at: at() }); tx('ABCD'.charAt(i), x, y, { size: 28, anchor: 'middle', title: true, at: k - 1 }); tx(o, x + 32, y, { size: 26, chars: 30, at: k - 1 }); });
+      else { S.rect(380, 560, 840, 120, { color: '#2a8a52', fill: '#2a8a52', light: 0.82, at: 'late' }); tx(V.answer, 800, 620, { size: 34, chars: 46, anchor: 'middle', mid: true, at: 'late' }); }
     } else if (K === 'recap') {
       var rp = V.points, cols = rp.length > 3 ? 2 : 1;
       rp.forEach(function (p, i) {

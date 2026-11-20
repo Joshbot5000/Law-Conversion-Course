@@ -83,11 +83,18 @@
         { kind: 'roundup', heading: 'More cases', narration: 'Two more quick ones.', cards: keep.filter(function (c) { return c.type === 'case'; }).slice(1).map(function (c) { return c.id; }), visual: { kind: 'roundup', cases: keep.filter(function (c) { return c.type === 'case'; }).slice(1, 3).map(function (c) { return { name: c.name, label: 'A short rule', icon: 'gavel' }; }) } },
         { kind: 'compare', heading: 'Shield or sword?', narration: 'Here is the difference between the two ideas.', cards: [], visual: { kind: 'compare', left: { title: 'Shield', icon: 'lock', points: ['Defence only'] }, right: { title: 'Sword', icon: 'cross', points: ['No new claim'] } } },
         { kind: 'principle', heading: 'The big rule', narration: 'So the big rule is simple.', cards: [], visual: { kind: 'principle', icon: 'scales', rule: 'A clear promise relied on can bind', points: ['Clear', 'Relied on', 'Fair'] } },
-        { kind: 'quiz', heading: 'Quick check', narration: 'Quick check. Can a promise ever be used to start a claim? Pause and have a think. The answer is no. It is a shield, not a sword.', cards: [], visual: { kind: 'quiz', question: 'Can estoppel start a claim?', answer: 'No: a shield, not a sword' } },
+        { kind: 'quiz', heading: 'Quick check', narration: 'Quick check. Can a promise ever be used to start a claim? Pause and have a think. The answer is no. It is a shield, not a sword.', cards: [], visual: { kind: 'quiz', question: 'Priya now sues Sam for a brand-new payment, relying only on her promise. Will estoppel help her?', options: ['Yes, any promise can be enforced', 'No: estoppel is a shield, not a sword', 'Only if Sam signed a deed'], answer: 1, explain: 'Estoppel can only defend against a claim; it cannot start one, as Combe v Combe shows.' } },
         { kind: 'apply', heading: 'Back to Sam', narration: 'So can Priya go back? Not for the past rent.', cards: [], visual: { kind: 'apply', characters: [{ name: 'Sam', icon: 'person' }], verdict: 'Sam is protected', good: true } },
         { kind: 'recap', heading: 'Recap', narration: 'Let us recap the key points.', cards: [], visual: { kind: 'recap', points: ['Clear promise', 'Reliance', 'Fairness', 'Shield not sword'] } }
       ];
+      if (window.__vdLong) sc.forEach(function (s) { if (s.kind !== 'quiz') s.narration += ' ' + Array(70).join('This is extra detail that runs on. '); });
       return JSON.stringify({ title: 'Mock explainer', scenes: sc });
+    }
+    if (text.indexOf('EXPLAINER VIDEO SHORTEN') !== -1) {
+      window.__mock.shortened = (window.__mock.shortened || 0) + 1;
+      var all = JSON.parse(text.slice(text.indexOf('\n[') + 1));
+      all.forEach(function (s) { if (s.kind !== 'quiz') s.narration = s.narration.replace(/( This is extra detail that runs on\.)+/g, ''); });
+      return JSON.stringify({ scenes: all });
     }
     if (text.indexOf('REVISION POSTERS — ') !== -1) {
       var M = window.__mock; M.ps = (M.ps || 0) + 1;

@@ -35,7 +35,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   const p = ps[0];
   ok(/Cover EVERY card/.test(p) && /Never invent a case/.test(p) && /clearly made up/.test(p) && /proper little story/.test(p) && /say every case.s name aloud/.test(p), 'prompt: only your cards, every card, cases as full stories, the example clearly made up');
   ok(/ELI5 analogy/.test(p) && /why it exists or why it matters/.test(p) && /when it applies and when it does not/.test(p), 'prompt: every principle explained in layers (rule, analogy, why, when, sum-up)');
-  ok(/Calm and unhurried/.test(p) && /warm, patient, encouraging/.test(p) && /"quiz" check-in/.test(p), 'prompt: calm, warm tutor with a quiz check-in');
+  ok(/Calm and unhurried/.test(p) && /warm, patient, encouraging/.test(p) && /QUIZ CHECK-INS: exactly 1/.test(p) && /applies what they have just learnt to the made-up example/.test(p) && /never say the answer in the narration/.test(p), 'prompt: calm, warm tutor; a quiz check-in applying the law to the example');
   ok(/favourite law tutor/.test(p) && /write for the ear/.test(p), 'prompt: warm human tutor voice, written to be spoken');
   ok(/Combe v Combe/.test(p) && /550-750 words of narration IN TOTAL/.test(p), 'cards and a word budget (about 4-5 minutes) are in the prompt');
   const call = await page.evaluate(() => window.__mock.calls.find(c => typeof c.input === 'string' && c.input.includes('EXPLAINER')).opts);
@@ -43,6 +43,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 
   ok(await page.$('#vdStage.vd-st-papercraft'), 'the video opens in the style you chose');
   await page.selectOption('#vdStyle', 'whiteboard');
+  ok(/about \d+ min \+ 1 quiz check-in/.test(await page.textContent('.vd-head')), 'running time leaves out the quiz check-in, which is listed separately');
   // 2. Coverage and accuracy checks
   const head = await page.textContent('.vd-head');
   console.log('   ' + head.replace(/\s+/g, ' ').trim());
@@ -76,7 +77,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('[data-vd="pause"]');
   await page.selectOption('#vdRate', '1.15');
   ok(await page.evaluate(() => window.__mock.rate === 1.15), 'speed control changes the pace');
-  await page.click('.vd-dot[data-i="7"]');
+  await page.click('.vd-dot[data-i="8"]');
   await page.waitForFunction(() => window.__mock.tts.filter(t => !t.added).length === 2);
   await page.waitForTimeout(700);
   ok(/Pause/.test(await page.textContent('#vdCtl')) && await page.evaluate(() => window.claude && true), 'jumping to another scene keeps the Pause button working (the old reading ending is ignored)');
@@ -84,7 +85,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(await page.$('#vdStage.paused') && /Resume/.test(await page.textContent('#vdCtl')), 'clicking the picture pauses');
   await page.keyboard.press('Space');
   ok(!(await page.$('#vdStage.paused')) && /Pause/.test(await page.textContent('#vdCtl')), 'the space bar resumes');
-  ok(await page.evaluate(() => window.__mock.tts.filter(t => !t.added)[1].lines[0].id === 's7_0'), 'clicking a scene plays from there');
+  ok(await page.evaluate(() => window.__mock.tts.filter(t => !t.added)[1].lines[0].id === 's8_0'), 'clicking a scene plays from there');
   for (const i of [1, 2, 3, 4, 5, 6, 7, 8, 9]) { // screenshots of each kind of scene, for checking the look
     await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {}); await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(150);
     await page.evaluate(() => document.getAnimations().forEach(a => a.finish()));
@@ -94,11 +95,21 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
   await page.evaluate(() => { window.__ttsMaxChars = 600; window.__ttsLineMs = 60; window.__mock.tts = []; window.__mock.ttsRefused = 0; });
   await page.click('.vd-dot[data-i="0"]'); await page.click('[data-vd="play"]');
+  await page.waitForSelector('#vdAsk:not([hidden]) .vd-ask-opt', { timeout: 20000 });
+  ok(/^8 \/ 11$/.test(await page.textContent('#vdStage .vd-count')) && !/Pause/.test(await page.textContent('#vdCtl')), 'the video stops at the quiz check-in and waits for you');
+  ok(/Priya now sues Sam/.test(await page.textContent('#vdAsk')) && (await page.$$('.vd-ask-opt')).length === 3, 'the question applies the law to the made-up example, with options to choose from');
+  const ttsBefore = await page.evaluate(() => window.__mock.tts.length);
+  await page.click('.vd-ask-opt[data-o="0"]');
+  ok(await page.$('.vd-ask-opt.wrong[data-o="0"]') && await page.$('.vd-ask-opt.right[data-o="1"]') && /Not quite/.test(await page.textContent('.vd-ask-fb')) && /Combe v Combe/.test(await page.textContent('.vd-ask-fb')), 'a wrong answer is marked, the right one shown, with the reason');
+  await page.waitForFunction(n => window.__mock.tts.length > n, ttsBefore);
+  ok(await page.evaluate(n => window.__mock.tts[n].lines[0].len > 20, ttsBefore), 'the tutor reads out the explanation');
+  await page.click('[data-vd="cont"]');
+  ok(await page.evaluate(() => document.querySelector('#vdAsk').hidden) && /^9 \/ 11$/.test(await page.textContent('#vdStage .vd-count')), 'Continue carries on from the next scene');
   await page.waitForFunction(() => /Play again/.test(document.querySelector('#vdCtl').textContent), null, { timeout: 20000 });
   const fed = await page.evaluate(() => ({ calls: window.__mock.tts.length, refused: window.__mock.ttsRefused, ids: window.__mock.tts.flatMap(t => t.lines.map(l => l.id)) }));
   ok(fed.refused === 0 && fed.calls >= 5 && [...Array(11).keys()].every(i => fed.ids.includes('s' + i + '_0')), 'a long video plays to the end, fed to the voice a scene or two at a time (' + fed.calls + ' calls, none refused)');
   await page.evaluate(() => { window.__ttsMaxChars = 40; window.__mock.ttsRefused = 0; });
-  await page.click('[data-vd="play"]');
+  await page.click('.vd-dot[data-i="8"]'); await page.click('[data-vd="play"]');
   await page.waitForFunction(() => window.__mock.ttsRefused > 0, null, { timeout: 5000 });
   await page.waitForTimeout(300);
   ok(/Pause/.test(await page.textContent('#vdCtl')), 'if the voice refuses a part anyway, the video keeps going with captions instead of getting stuck');
@@ -150,6 +161,17 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('#exportBtn'); await page.waitForFunction(() => window.__mock.saved && /backup/.test(window.__mock.saved.filename), null, { timeout: 10000 });
   ok(await page.evaluate(() => (JSON.parse(window.__mock.saved.data).videos || []).length === 1), 'backup includes your videos');
 
+  // 7b. A full lesson that comes back over 12 minutes is tightened (one extra request, only then)
+  await page.evaluate(() => { window.__vdLong = true; window.__mock.calls = []; window.__mock.shortened = 0; });
+  await page.click('#vdBtn'); await page.click('[data-vd="list"]', { timeout: 1500 }).catch(() => {}); await page.click('[data-vd="new"]');
+  await page.click('[data-vd="mode"][data-m="topic"]'); await page.click('[data-vd="len"][data-l="full"]'); await page.selectOption('#vdTopic', 'contract|Promissory Estoppel'); await page.click('[data-vd="make"]');
+  await page.waitForSelector('#vdStage svg', { timeout: 20000 });
+  const fp = (await calls())[0];
+  ok(/1,250-1,550 words/.test(fp) && /never more than 1,550, so it stays within 12 minutes; quiz scenes do not count/.test(fp) && /QUIZ CHECK-INS: 2 or 3 \(never more\)/.test(fp), 'full lesson: 12-minute budget (quizzes not counted) and 2-3 quiz check-ins');
+  const mins = +/about (\d+) min/.exec(await page.textContent('.vd-head'))[1];
+  ok(await page.evaluate(() => window.__mock.shortened === 1 && window.__mock.calls.filter(c => typeof c.input === 'string' && /EXPLAINER VIDEO (SCRIPT|SHORTEN)/.test(c.input)).length === 2) && mins <= 12, 'a script over 12 minutes is tightened before you see it (now about ' + mins + ' min)');
+  await page.evaluate(() => { window.__vdLong = false; });
+  await page.keyboard.press('Escape');
   // 8. Where the voice isn't available (Safari, mobile apps, friends outside your organisation): captions, auto-advancing
   const ctx2 = await b.newContext(); await ctx2.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());
   await ctx2.addInitScript({ path: path.join(T, 'sample_seed.js') }); await ctx2.addInitScript(() => {
