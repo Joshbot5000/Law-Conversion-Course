@@ -225,7 +225,7 @@
       });
     },
     add: function (l) { return tts.speak(l); },
-    stop: function () { if (cur) cur.end('stopped'); return Promise.resolve(); },
+    stop: function () { window.__mock.ttsStops = (window.__mock.ttsStops || 0) + 1; if (cur) cur.end('stopped'); return Promise.resolve(); },
     pause: function () { if (cur) cur.pause(); return Promise.resolve(); },
     resume: function () { if (cur) cur.resume(); return Promise.resolve(); },
     setRate: function (r) { window.__mock.rate = r; return Promise.resolve(); },

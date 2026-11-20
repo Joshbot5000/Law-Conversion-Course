@@ -235,7 +235,7 @@
       if (t) {
         vd.unsub.push(t.onLine(function (e) { var m = vd.playing && e.id && /^s(\d+)(?:_0)?$/.exec(e.id); if (m) vdShow(+m[1]); }));
         vd.unsub.push(t.onState(function (e) {
-          if (e.state === 'idle' && vd.playing) {
+          if (e.state === 'idle' && vd.playing && e.reason !== 'replaced' && !vd.restarting) {
             vd.playing = false; vd.paused = false;
             if (e.reason === 'completed') vd.ended = true;
             else if (e.reason === 'not_granted' || e.reason === 'unavailable') { vdVoiceOff(e.reason); }
@@ -274,7 +274,7 @@
     vd.scene = i;
     var key = vdStyleKey(), T = VD_STYLES[key], sc = v.scenes[i], d = vdSceneSVG(v, sc, i, key), dur = vdDur(sc);
     var step = Math.min(1.2, (dur * 0.68) / Math.max(1, d.steps));
-    $('#vdStage').className = 'vd-stage vd-st-' + key + (vd.paused ? ' paused' : '');
+    $('#vdStage').className = 'vd-stage vd-st-' + key + (vd.paused ? ' paused' : '') + (vd.playing ? '' : ' idle');
     $('#vdStage').innerHTML = '<svg viewBox="0 0 1280 720" class="vd-svg" role="img" aria-label="' + esc(sc.heading || v.title) + '" style="--step:' + step.toFixed(2) + 's;--late:' + (dur * 0.62).toFixed(1) + 's">' +
       '<defs>' + vdDefs(T, v.seed || 7) + '</defs>' + vdBg(T) + '<g class="vd-cam"' + (T.chalk ? ' filter="url(#vdChalk)"' : '') + '>' + d.svg + '</g>' +
       '<text x="1210" y="690" font-size="22" fill="' + T.sub + '" text-anchor="end" class="vd-plain vd-count">' + (i + 1) + ' / ' + v.scenes.length + '</text></svg>';
@@ -284,6 +284,7 @@
     renderVdControls();
   }
   function renderVdControls() {
+    var st = $('#vdStage'); if (st) { st.classList.toggle('idle', !vd.playing); st.classList.toggle('paused', vd.playing && vd.paused); }
     var c = $('#vdCtl'); if (!c || !vd.cur) return;
     var v = vd.cur, voiced = !!vd.tts;
     c.innerHTML = '<div class="vd-row">' +
@@ -307,6 +308,7 @@
     vd.playing = true; vd.paused = false;
     vdShow(from);
     if (vd.tts) {
+      vd.restarting = true; setTimeout(function () { vd.restarting = false; }, 600);
       // One reading: a line per scene, so each scene's drawing starts as its words do.
       var lines = vdLines(v, from);
       vd.tts.speak(lines, { rate: vd.rate, voice: vd.voice }).then(null, function (err) {
@@ -344,7 +346,8 @@
     return why + (vd.ttsOff ? '' : ' Here it plays with captions.');
   }
   function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
-  function vdStop() { stopVdTimer(); var was = vd.playing; vd.playing = false; vd.paused = false; if (was && vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdStop() { stopVdTimer(); vd.playing = false; vd.paused = false; if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdToggle() { if (!vd.cur) return; if (vd.playing) vdPause(); else vdPlay(vd.ended ? 0 : vd.scene); }
   function vdPause() {
     if (!vd.playing) return;
     vd.paused = !vd.paused;
@@ -369,7 +372,7 @@
       var v = vd.cur, c = v.coverage;
       body.innerHTML = '<div class="vd-head"><h3>' + esc(v.title) + '</h3><span>' + (v.module ? esc(MODULE_LABEL[v.module]) + ' · ' : '') + plural(v.scenes.length, 'scene') + ' · about ' + Math.max(1, Math.round(v.scenes.reduce(function (n, s) { return n + s.narration.length; }, 0) / 14.5 / 60)) + ' min · ' +
         '<b class="vd-cov">Covers ' + c.covered + (c.added ? ' + ' + c.added : '') + ' of ' + plural(c.cards, 'card') + ' on this topic</b>' + (c.added ? ' (' + c.added + ' added by the coverage check)' : '') + (c.flagged ? ' · <b class="vd-bad">' + c.flagged + ' to check</b>' : '') + '</span></div>' +
-        '<div class="vd-stage" id="vdStage"></div><div class="vd-ctl" id="vdCtl"></div><div class="vd-cap" id="vdCap"></div>';
+        '<div class="vd-stage" id="vdStage" title="Click to play or pause (or press the space bar)"></div><div class="vd-ctl" id="vdCtl"></div><div class="vd-cap" id="vdCap"></div>';
       foot.innerHTML = '<button type="button" class="btn" data-vd="list">← All videos</button><span class="spacer"></span><button type="button" class="btn" data-close>Close</button>';
       vdShow(vd.scene || 0);
       return;
@@ -407,7 +410,7 @@
     else if (a === 'sty') { vd.style = el.getAttribute('data-s'); vdPref('style', vd.style); renderVideo(); }
     else if (a === 'make') startVideo();
     else if (a === 'cancel') { if (vd.job) vd.job.ctl.abort(); vd.job = null; vd.view = 'new'; renderVideo(); }
-    else if (a === 'open') { var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
+    else if (a === 'open') { vdStop(); var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
     else if (a === 'play') vdPlay(vd.ended ? 0 : vd.scene);
     else if (a === 'pause') vdPause();
     else if (a === 'stop') vdStop();
@@ -430,7 +433,12 @@
     $('#vdBtn').addEventListener('click', function () { openVideo(); });
     var m = $('#vdModal');
     m._onClose = function () { vdStop(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
-    m.addEventListener('click', function (ev) { var b = ev.target.closest('[data-vd]'); if (b) videoAction(b.getAttribute('data-vd'), b); });
+    m.addEventListener('click', function (ev) { var b = ev.target.closest('[data-vd]'); if (b) videoAction(b.getAttribute('data-vd'), b); else if (ev.target.closest('#vdStage')) vdToggle(); });
+    document.addEventListener('keydown', function (ev) {
+      if ((ev.key === ' ' || ev.key === 'k') && !m.hidden && topModal() === m && vd.view === 'play' && !(ev.target.closest && ev.target.closest('input, select, textarea, button, [contenteditable]'))) { ev.preventDefault(); vdToggle(); }
+    });
+    // Captions-only playback stops moving on when you switch away; the voice stops itself.
+    document.addEventListener('visibilitychange', function () { if (document.hidden && vd.playing && !vd.paused && !vd.tts) vdPause(); });
     m.addEventListener('change', function (ev) {
       var t = ev.target;
       if (t.id === 'vdTopic') { vd.topic = t.value; renderVideo(); }

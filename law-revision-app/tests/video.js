@@ -78,6 +78,12 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(await page.evaluate(() => window.__mock.rate === 1.15), 'speed control changes the pace');
   await page.click('.vd-dot[data-i="7"]');
   await page.waitForFunction(() => window.__mock.tts.length === 2);
+  await page.waitForTimeout(700);
+  ok(/Pause/.test(await page.textContent('#vdCtl')) && await page.evaluate(() => window.claude && true), 'jumping to another scene keeps the Pause button working (the old reading ending is ignored)');
+  await page.click('#vdStage');
+  ok(await page.$('#vdStage.paused') && /Resume/.test(await page.textContent('#vdCtl')), 'clicking the picture pauses');
+  await page.keyboard.press('Space');
+  ok(!(await page.$('#vdStage.paused')) && /Pause/.test(await page.textContent('#vdCtl')), 'the space bar resumes');
   ok(await page.evaluate(() => window.__mock.tts[1].lines[0].id === 's7_0' && window.__mock.tts[1].lines.length >= 4), 'clicking a scene plays from there');
   for (const i of [1, 2, 3, 4, 5, 6, 7, 8, 9]) { // screenshots of each kind of scene, for checking the look
     await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {}); await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(150);
@@ -112,8 +118,12 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('[data-vd="play"]'); await page.waitForTimeout(600);
   ok((await calls()).length === 0, 'watching a saved video again uses no Claude requests');
   await page.click('[data-vd="stop"]');
+  await page.click('[data-vd="play"]', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400);
+  await page.click('.vd-dot[data-i="4"]'); await page.waitForTimeout(500);
+  const stopsBefore = await page.evaluate(() => window.__mock.ttsStops || 0);
   await page.keyboard.press('Escape');
-  ok(await page.evaluate(() => document.querySelector('#vdModal').hidden), 'closing the window stops the video');
+  ok(await page.evaluate(() => document.querySelector('#vdModal').hidden), 'closing the window closes the video');
+  ok(await page.evaluate(n => (window.__mock.ttsStops || 0) > n, stopsBefore), 'closing the window always stops the voice, even after jumping scenes');
 
   // 6. A concept instead of a topic
   await page.click('#vdBtn'); await page.click('[data-vd="list"]').catch(() => {}); await page.click('[data-vd="new"]');
