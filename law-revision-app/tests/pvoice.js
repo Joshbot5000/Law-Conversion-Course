@@ -22,7 +22,7 @@ if (!fs.existsSync(path.join(LIBS, 'phone-voice', 'manifest.json'))) { console.l
     const u = new URL(r.request().url());
     if (u.pathname === '/app/index.html') return r.fulfill({ path: path.join(T, 'online_wrapped.html'), contentType: 'text/html', headers: { 'content-security-policy': CSP } });
     const m = /^\/app\/tts\/(.+)$/.exec(u.pathname);
-    if (m && fs.existsSync(path.join(LIBS, 'phone-voice', m[1]))) { served++; return r.fulfill({ path: path.join(LIBS, 'phone-voice', m[1]), contentType: m[1].endsWith('.json') ? 'application/json' : 'application/octet-stream' }); }
+    if (m && fs.existsSync(path.join(LIBS, 'phone-voice', m[1]))) { served++; return r.fulfill({ path: path.join(LIBS, 'phone-voice', m[1]), contentType: m[1].endsWith('.json') ? 'application/json' : 'application/wasm' }); }
     r.fulfill({ status: 404, body: '' });
   });
   await ctx.addInitScript({ path: path.join(T, 'sample_seed.js') });

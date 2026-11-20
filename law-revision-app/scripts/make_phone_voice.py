@@ -1,7 +1,8 @@
 """Builds libs/phone-voice: the files the phone voice needs, published next to the app under tts/.
 
 The app may only download from its own address, so the Kokoro-82M model (Apache-2.0) is split into parts under 15 MB
-(the artifact service's limit for one file) and published with the onnxruntime-web 1.20.1 engine file, three voices
+(the artifact service's limit for one file). The service only serves certain file types, so the data files
+are named .wasm (a binary type it serves); the app reads them as plain bytes and published with the onnxruntime-web 1.20.1 engine file, three voices
 and a manifest. Sources: the model from the kokoro-onnx GitHub release, voices from the kokoro-js npm package, the
 phoneme table from the kokoro-onnx PyPI package, the engine from the onnxruntime-web npm package.
 
@@ -35,18 +36,18 @@ def main(dl):
         sys.exit('the model download does not match the expected file')
     parts = []
     for i in range(0, len(model), PART):
-        name = 'kokoro-int8-%d.bin' % (i // PART)
+        name = 'kokoro-int8-%d.wasm' % (i // PART)
         open(os.path.join(out, name), 'wb').write(model[i:i + PART]); parts.append(name)
     open(os.path.join(out, 'ort-wasm-1.20.1.wasm'), 'wb').write(from_tgz(get(NPM.format('onnxruntime-web', '1.20.1')), 'package/dist/ort-wasm-simd-threaded.wasm'))
     kj = get(NPM.format('kokoro-js', '1.2.1'))
     for v in VOICES:
-        open(os.path.join(out, v + '.bin'), 'wb').write(from_tgz(kj, 'package/voices/%s.bin' % v))
+        open(os.path.join(out, 'voice-' + v + '.wasm'), 'wb').write(from_tgz(kj, 'package/voices/%s.bin' % v))
     meta = json.loads(get('https://pypi.org/pypi/kokoro-onnx/0.4.9/json'))
     sdist = [u['url'] for u in meta['urls'] if u['packagetype'] == 'sdist'][0]
     vocab = json.loads(from_tgz(get(sdist), 'kokoro_onnx-0.4.9/src/kokoro_onnx/config.json'))['vocab']
-    files = parts + ['ort-wasm-1.20.1.wasm'] + [v + '.bin' for v in VOICES]
+    files = parts + ['ort-wasm-1.20.1.wasm'] + ['voice-' + v + '.wasm' for v in VOICES]
     man = {'name': 'Kokoro-82M v1.0 (int8), Apache-2.0', 'sha256': MODEL_SHA, 'bytes': sum(os.path.getsize(os.path.join(out, f)) for f in files),
-           'model': parts, 'wasm': 'ort-wasm-1.20.1.wasm', 'voices': {v: v + '.bin' for v in VOICES}, 'vocab': vocab}
+           'model': parts, 'wasm': 'ort-wasm-1.20.1.wasm', 'voices': {v: 'voice-' + v + '.wasm' for v in VOICES}, 'vocab': vocab}
     json.dump(man, open(os.path.join(out, 'manifest.json'), 'w'), ensure_ascii=False)
     print('phone voice files in', os.path.normpath(out))
 
