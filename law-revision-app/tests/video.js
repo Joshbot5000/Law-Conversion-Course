@@ -37,7 +37,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(/ELI5 analogy/.test(p) && /why it exists or why it matters/.test(p) && /when it applies and when it does not/.test(p), 'prompt: every principle explained in layers (rule, analogy, why, when, sum-up)');
   ok(/Calm and unhurried/.test(p) && /warm, patient, encouraging/.test(p) && /"quiz" check-in/.test(p), 'prompt: calm, warm tutor with a quiz check-in');
   ok(/favourite law tutor/.test(p) && /write for the ear/.test(p), 'prompt: warm human tutor voice, written to be spoken');
-  ok(/Combe v Combe/.test(p) && /LENGTH: refresher/.test(p), 'cards and length are in the prompt');
+  ok(/Combe v Combe/.test(p) && /550-750 words of narration IN TOTAL/.test(p), 'cards and a word budget (about 4-5 minutes) are in the prompt');
   const call = await page.evaluate(() => window.__mock.calls.find(c => typeof c.input === 'string' && c.input.includes('EXPLAINER')).opts);
   ok(call.modelTier === 'default', 'uses the standard model tier (not the most expensive)');
 
@@ -63,9 +63,9 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   // 4. Playing with the voice
   ok(/Tutor voice on/.test(await page.textContent('#vdCtl')) && await page.$('#vdVoice'), 'says the tutor voice is on, with a voice picker');
   await page.click('[data-vd="play"]');
-  await page.waitForFunction(() => window.__mock.tts && window.__mock.tts.length === 1);
-  const sp = await page.evaluate(() => window.__mock.tts[0]);
-  ok(sp.lines.length >= 11 && sp.lines[0].id === 's0_0' && [...Array(11).keys()].every(i => sp.lines.some(l => l.id === 's' + i + '_0')) && sp.lines.every(l => l.len <= 300 && l.voice === 'buttery'), 'one reading in a natural Claude voice, each scene in short breaths (' + sp.lines.length + ' lines)');
+  await page.waitForFunction(() => window.__mock.tts && window.__mock.tts.length >= 2);
+  const sp = await page.evaluate(() => ({ lines: window.__mock.tts.flatMap(t => t.lines), opts: window.__mock.tts[0].opts, first: window.__mock.tts[0].lines.map(l => l.id), added: window.__mock.tts[1].added }));
+  ok(sp.first[0] === 's0_0' && sp.first.every(id => /^s0_/.test(id)) && sp.added && sp.lines.every(l => l.len <= 300 && l.voice === 'buttery'), 'the Claude voice gets a scene at a time, each in short breaths');
   ok(sp.opts.rate === 0.85, 'starts at a calm tutor pace (0.85)');
   await page.waitForFunction(() => /^3 \/ 11$/.test(document.querySelector('#vdStage .vd-count').textContent), null, { timeout: 8000 });
   ok(true, 'scenes change as the voice reaches each one');
@@ -77,19 +77,33 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.selectOption('#vdRate', '1.15');
   ok(await page.evaluate(() => window.__mock.rate === 1.15), 'speed control changes the pace');
   await page.click('.vd-dot[data-i="7"]');
-  await page.waitForFunction(() => window.__mock.tts.length === 2);
+  await page.waitForFunction(() => window.__mock.tts.filter(t => !t.added).length === 2);
   await page.waitForTimeout(700);
   ok(/Pause/.test(await page.textContent('#vdCtl')) && await page.evaluate(() => window.claude && true), 'jumping to another scene keeps the Pause button working (the old reading ending is ignored)');
   await page.click('#vdStage');
   ok(await page.$('#vdStage.paused') && /Resume/.test(await page.textContent('#vdCtl')), 'clicking the picture pauses');
   await page.keyboard.press('Space');
   ok(!(await page.$('#vdStage.paused')) && /Pause/.test(await page.textContent('#vdCtl')), 'the space bar resumes');
-  ok(await page.evaluate(() => window.__mock.tts[1].lines[0].id === 's7_0' && window.__mock.tts[1].lines.length >= 4), 'clicking a scene plays from there');
+  ok(await page.evaluate(() => window.__mock.tts.filter(t => !t.added)[1].lines[0].id === 's7_0'), 'clicking a scene plays from there');
   for (const i of [1, 2, 3, 4, 5, 6, 7, 8, 9]) { // screenshots of each kind of scene, for checking the look
     await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {}); await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(150);
     await page.evaluate(() => document.getAnimations().forEach(a => a.finish()));
     await page.locator('#vdStage').screenshot({ path: path.join(T, 'vd_scene' + i + '.png') });
   }
+  // 4a. A video longer than the voice will take in one go still plays: it's fed a scene or two at a time
+  await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
+  await page.evaluate(() => { window.__ttsMaxChars = 600; window.__ttsLineMs = 60; window.__mock.tts = []; window.__mock.ttsRefused = 0; });
+  await page.click('.vd-dot[data-i="0"]'); await page.click('[data-vd="play"]');
+  await page.waitForFunction(() => /Play again/.test(document.querySelector('#vdCtl').textContent), null, { timeout: 20000 });
+  const fed = await page.evaluate(() => ({ calls: window.__mock.tts.length, refused: window.__mock.ttsRefused, ids: window.__mock.tts.flatMap(t => t.lines.map(l => l.id)) }));
+  ok(fed.refused === 0 && fed.calls >= 5 && [...Array(11).keys()].every(i => fed.ids.includes('s' + i + '_0')), 'a long video plays to the end, fed to the voice a scene or two at a time (' + fed.calls + ' calls, none refused)');
+  await page.evaluate(() => { window.__ttsMaxChars = 40; window.__mock.ttsRefused = 0; });
+  await page.click('[data-vd="play"]');
+  await page.waitForFunction(() => window.__mock.ttsRefused > 0, null, { timeout: 5000 });
+  await page.waitForTimeout(300);
+  ok(/Pause/.test(await page.textContent('#vdCtl')), 'if the voice refuses a part anyway, the video keeps going with captions instead of getting stuck');
+  await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
+  await page.evaluate(() => { window.__ttsMaxChars = 0; window.__ttsLineMs = 400; });
   // 4b. Styles: any style, switched while watching, at no cost
   const before = (await calls()).length;
   for (const st of ['watercolour', 'papercraft', 'anime', 'retro', 'chalkboard', 'whiteboard']) {

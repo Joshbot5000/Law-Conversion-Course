@@ -70,6 +70,9 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   anime (chibi characters), retro print (halftone + misregistration), chalkboard), switchable while watching for free; style + pace are
   remembered in localStorage `lawRevisionApp.v1.videoPrefs`. Voice = the platform `tts` capability ONLY (natural Claude voice); each
   scene is spoken in short "breaths" (`vdChunks`, ≤260 chars, line ids `s<i>_<j>`; `onLine` on `_0` switches scene), default pace 0.85.
+  The voice is FED A SCENE OR TWO AT A TIME (`speak` then `add`, topped up by `vd.ttsFeed` as scenes start): one whole long video in
+  a single call exceeds the voice allowance and is refused whole ("voice stopped unexpectedly"). Any other voice failure falls back
+  to captions (`vdCaptionsFrom`). Length budgets in the prompt: Refresher 550-750 words total (~4-5 min), Full lesson 1,050-1,350 (≤10 min).
   No tts (Safari, mobile apps, outside-org viewers, offline copy) → a clear note and captions with timed auto-advance. The owner
   explicitly does NOT want the device/browser voice. Coverage check (free, local, `vdCoverage`): every card must appear — a case only
   counts if its name is said or shown; missing ones get scenes built from the card's facts/rule/exam use (`auto`), before the recap;

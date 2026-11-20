@@ -116,7 +116,8 @@
       '- Never invent a case, citation, date, fact or rule. If a card has no facts, give only its rule.',
       '- The everyday example must be clearly made up ("Imagine…") and never presented as a real case.',
       'STRUCTURE: a "title" scene; a "hypo" scene introducing one everyday made-up example with named characters; then the law in a sensible order ("principle" or "steps" scenes; a "case" scene per important case; "roundup" for at most 2 smaller cases at a time; "compare" to distinguish two cases); ' + (q ? 'one' : 'a') + ' "quiz" check-in scene' + (q ? '' : ' after every 3-4 teaching scenes') + ' (ask a question, say "pause and have a think", then give the answer); an "apply" scene going back to the example; a "recap" scene.',
-      q ? 'LENGTH: refresher. Roughly one scene per principle and per important case. Each narration 70-130 words.' : 'LENGTH: full lesson. At least one scene per card, plus the quiz check-ins. Each narration 100-180 words.',
+      q ? 'LENGTH: a refresher of about 4-5 minutes at a calm pace: 550-750 words of narration IN TOTAL across all scenes (never more than 750). Spend the words where they matter most: core rules and leading cases get the fullest explanation; minor cases get a sentence or two in a roundup.'
+        : 'LENGTH: a full lesson of about 8-10 minutes at a calm, unhurried pace: 1,050-1,350 words of narration IN TOTAL across all scenes (never more than 1,350, so it stays under 10 minutes). Weigh and prioritise: core rules and leading cases get the full layered explanation; less important cases are told briefly (two or three sentences each, at most two per roundup). Never rush: cover less detail rather than speaking faster.',
       'Narration: no brackets, no citations or report references, no bullet points, no headings. Say case names naturally ("In Donoghue versus Stevenson…"); a year only if it helps.',
       'VISUALS: the app draws each scene as an animated illustration. Keep on-screen words SHORT (labels 1-6 words, rule up to 14 words). Pick lively, specific icons that match the story. Shapes by kind:',
       ' title: {"kind":"title","title":"","subtitle":"","icons":["up to 3"]}',
@@ -171,13 +172,13 @@
     var extra = [];
     rules.forEach(function (e) {
       extra.push(cleanScene({ kind: 'principle', auto: true, heading: vdClip(e.name, 70), cards: [e.id],
-        narration: 'One more rule to keep in your back pocket. It\'s called ' + e.name + '. ' + vdClip(e.ratio || e.facts, 900) + (e.strategy ? ' Why does it matter? ' + vdClip(e.strategy, 400) : ''),
+        narration: 'One more rule to keep in your back pocket. It\'s called ' + e.name + '. ' + vdClip(vdFirstSentence(e.ratio || e.facts, 320), 320) + (e.strategy ? ' Why does it matter? ' + vdFirstSentence(e.strategy, 180) : ''),
         visual: { kind: 'principle', icon: e.type === 'statute' ? 'book' : 'scales', rule: vdClip(vdFirstSentence(e.ratio || e.facts, 140), 140), points: [] } }));
     });
     for (var i = 0; i < cases.length; i += 2) {
       var grp = cases.slice(i, i + 2);
       extra.push(cleanScene({ kind: 'roundup', auto: true, heading: grp.length > 1 ? 'More cases to know' : 'One more case', cards: grp.map(function (e) { return e.id; }),
-        narration: (grp.length > 1 ? 'A few more cases to know. ' : 'One more case to know. ') + grp.map(function (e) { return 'Let\'s look at ' + e.name.replace(/ v /g, ' versus ') + '. ' + (e.facts ? 'Here\'s what happened. ' + vdClip(e.facts, 500) + ' ' : '') + 'And the rule it gives us? ' + vdClip(e.ratio, 500) + (e.strategy ? ' In the exam: ' + vdClip(e.strategy, 260) : ''); }).join(' '),
+        narration: (grp.length > 1 ? 'A few more cases to know. ' : 'One more case to know. ') + grp.map(function (e) { return 'Let\'s look at ' + e.name.replace(/ v /g, ' versus ') + '. ' + (e.facts ? 'Here\'s what happened. ' + vdFirstSentence(e.facts, 240) + ' ' : '') + 'And the rule it gives us? ' + vdFirstSentence(e.ratio, 260); }).join(' '),
         visual: { kind: 'roundup', cases: grp.map(function (e) { return { name: vdClip(e.name, 60), label: vdClip(vdFirstSentence(e.ratio, 130), grp.length > 2 ? 80 : 130), icon: 'gavel' }; }) } }));
     }
     var at = scenes.length && scenes[scenes.length - 1].kind === 'recap' ? scenes.length - 1 : scenes.length;
@@ -233,8 +234,9 @@
     return window.claude.use('tts').then(function (t) {
       vd.tts = t || null;
       if (t) {
-        vd.unsub.push(t.onLine(function (e) { var m = vd.playing && e.id && /^s(\d+)(?:_0)?$/.exec(e.id); if (m) vdShow(+m[1]); }));
+        vd.unsub.push(t.onLine(function (e) { var m = vd.playing && e.id && /^s(\d+)(?:_0)?$/.exec(e.id); if (m) { vdShow(+m[1]); if (vd.ttsFeed) vd.ttsFeed(+m[1]); } }));
         vd.unsub.push(t.onState(function (e) {
+          if (e.state === 'idle' && vd.playing && e.reason === 'completed' && vd.ttsMore && vd.ttsMore()) { vd.ttsFeed(-1); return; }
           if (e.state === 'idle' && vd.playing && e.reason !== 'replaced' && !vd.restarting) {
             vd.playing = false; vd.paused = false;
             if (e.reason === 'completed') vd.ended = true;
@@ -310,18 +312,37 @@
     vdShow(from);
     if (vd.tts) {
       vd.restarting = true; setTimeout(function () { vd.restarting = false; }, 600);
-      // One reading: a line per scene, so each scene's drawing starts as its words do.
-      var lines = vdLines(v, from);
-      vd.tts.speak(lines, { rate: vd.rate, voice: vd.voice }).then(null, function (err) {
-        if (!err || err.code === 'stopped') return;
-        vd.playing = false;
+      // The voice is handed two scenes at a time and topped up as each scene starts: one long video in a single
+      // reading can be more than the voice will take at once, and then it refuses the whole thing.
+      var groups = [], tok = vd.ttsTok = (vd.ttsTok || 0) + 1, next = 0, first = true;
+      vdLines(v, from).forEach(function (l) { var s = +/^s(\d+)/.exec(l.id)[1] - from; (groups[s] = groups[s] || []).push(l); });
+      groups = groups.filter(Boolean);
+      var fail = function (err) {
+        if (tok !== vd.ttsTok || !err || err.code === 'stopped') return;
+        vd.ttsFeed = vd.ttsMore = null;
         if (err.code === 'not_granted' || err.code === 'unavailable') { vdVoiceOff(err.code); vdPlay(vd.scene); return; }
-        toast(err.code === 'rate_limited' ? 'The voice needs a short break — try again soon, or watch with captions.' : err.code === 'no_gesture' ? 'Press Play again to start the voice.' : 'The voice stopped unexpectedly. Press Play to carry on.', { type: 'error' });
-        renderVdControls();
-      });
+        if (err.code === 'no_gesture') { vd.playing = false; renderVdControls(); toast('Press Play again to start the voice.'); return; }
+        // Anything else: keep the video going with captions from here, and say why.
+        toast((err.code === 'rate_limited' ? 'The voice needs a short break' : 'The voice couldn\'t read this part (' + (err.code || 'error') + ')') + ', so the video carries on with captions. Press Play later to hear the voice again.', { type: 'error', timeout: 8000 });
+        vdCaptionsFrom(vd.scene);
+      };
+      var feed = function () {
+        if (tok !== vd.ttsTok || next >= groups.length) return;
+        var g = groups[next++], p = first ? vd.tts.speak(g, { rate: vd.rate, voice: vd.voice }) : vd.tts.add(g, { rate: vd.rate, voice: vd.voice });
+        first = false; p.then(null, fail);
+      };
+      vd.ttsMore = function () { return tok === vd.ttsTok && next < groups.length; };
+      vd.ttsFeed = function (scene) { if (tok !== vd.ttsTok) return; var at = scene < 0 ? next : scene - from; while (next < groups.length && next <= at + 2) feed(); };
+      feed(); feed();
       return;
     }
     if (vd.pvOn && pv.state === 'ready') { vdPhonePlay(from); return; }
+    vdCaptionsFrom(from);
+  }
+  function vdCaptionsFrom(from) {
+    var v = vd.cur; if (!v) return;
+    stopVdTimer(); vd.ttsTok = (vd.ttsTok || 0) + 1; vd.ttsFeed = vd.ttsMore = null;
+    vd.playing = true; vd.paused = false; if (vd.scene !== from) vdShow(from); else renderVdControls();
     // No voice here: captions, timed to roughly how long the words take to say.
     var tick = function () {
       if (!vd.playing || vd.paused) return;
@@ -401,7 +422,7 @@
     playAt(0);
   }
   function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
-  function vdStop(leaving) { stopVdTimer(); vd.playing = false; vd.paused = false; vd.pvTok = (vd.pvTok || 0) + 1; pvHalt(); if (leaving) { pvDrop(); vd.prepKeys = null; } if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
+  function vdStop(leaving) { stopVdTimer(); vd.ttsTok = (vd.ttsTok || 0) + 1; vd.ttsFeed = vd.ttsMore = null; vd.playing = false; vd.paused = false; vd.pvTok = (vd.pvTok || 0) + 1; pvHalt(); if (leaving) { pvDrop(); vd.prepKeys = null; } if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
   function vdToggle() { if (!vd.cur) return; if (vd.playing) vdPause(); else vdPlay(vd.ended ? 0 : vd.scene); }
   function vdPause() {
     if (!vd.playing) return;
@@ -426,7 +447,7 @@
     }
     if (vd.view === 'play' && vd.cur) {
       var v = vd.cur, c = v.coverage;
-      body.innerHTML = '<div class="vd-head"><h3>' + esc(v.title) + '</h3><span>' + (v.module ? esc(MODULE_LABEL[v.module]) + ' · ' : '') + plural(v.scenes.length, 'scene') + ' · about ' + Math.max(1, Math.round(v.scenes.reduce(function (n, s) { return n + s.narration.length; }, 0) / 14.5 / 60)) + ' min · ' +
+      body.innerHTML = '<div class="vd-head"><h3>' + esc(v.title) + '</h3><span>' + (v.module ? esc(MODULE_LABEL[v.module]) + ' · ' : '') + plural(v.scenes.length, 'scene') + ' · about ' + Math.max(1, Math.round(v.scenes.reduce(function (n, s) { return n + vdDur(s) * (window.__vdFast || 1); }, 0) / 60)) + ' min · ' +
         '<b class="vd-cov">Covers ' + c.covered + (c.added ? ' + ' + c.added : '') + ' of ' + plural(c.cards, 'card') + ' on this topic</b>' + (c.added ? ' (' + c.added + ' added by the coverage check)' : '') + (c.flagged ? ' · <b class="vd-bad">' + c.flagged + ' to check</b>' : '') + '</span></div>' +
         '<div class="vd-stage" id="vdStage" title="Click to play or pause (or press the space bar)"></div><div class="vd-ctl" id="vdCtl"></div><div class="vd-cap" id="vdCap"></div>';
       foot.innerHTML = '<button type="button" class="btn" data-vd="list">← All videos</button><span class="spacer"></span><button type="button" class="btn" data-close>Close</button>';

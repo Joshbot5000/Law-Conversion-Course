@@ -210,21 +210,26 @@
   var tl = { state: [], line: [] }, cur = null;
   var ttsState = function (st, reason) { tl.state.forEach(function (f) { f({ state: st, reason: reason }); }); };
   var tts = {
-    speak: function (lines, opts) {
-      if (cur) { cur.end('replaced'); }
+    speak: function (lines, opts, adding) {
       lines = typeof lines === 'string' ? [{ text: lines }] : lines;
+      var size = lines.reduce(function (n, l) { return n + l.text.length; }, 0);
+      if (window.__ttsMaxChars && size > window.__ttsMaxChars) { window.__mock.ttsRefused = (window.__mock.ttsRefused || 0) + 1; return Promise.reject({ code: 'invalid_argument', message: 'too long for the allowance' }); }
+      if (adding && cur) { window.__mock.tts.push({ lines: lines.map(function (l) { return { id: l.id, voice: l.voice, len: l.text.length }; }), opts: opts, added: true }); return cur.append(lines); }
+      if (cur) { cur.end('replaced'); }
       window.__mock.tts = (window.__mock.tts || []).concat([{ lines: lines.map(function (l) { return { id: l.id, voice: l.voice, len: l.text.length }; }), opts: opts }]);
       if (lines.some(function (l) { return !l.text || l.text.length > 2000; })) return Promise.reject({ code: 'invalid_argument', message: 'bad line' });
       return new Promise(function (res, rej) {
         var i = 0, t = null, me = { paused: false };
+        var waiters = [{ upto: lines.length, res: res }];
+        me.append = function (more) { return new Promise(function (r2, j2) { lines = lines.concat(more); waiters.push({ upto: lines.length, res: r2, rej: j2 }); if (me.idleWait) { me.idleWait = false; me.go(); } }); };
         me.end = function (reason) { clearTimeout(t); cur = null; ttsState('idle', reason); rej({ code: 'stopped', reason: reason }); };
-        me.go = function () { if (me.paused) return; if (i >= lines.length) { cur = null; ttsState('idle', 'completed'); res({ playedMs: 1000 }); return; } var l = lines[i]; tl.line.forEach(function (f) { f({ line: i, id: l.id }); }); i++; t = setTimeout(me.go, window.__ttsLineMs || 250); };
+        me.go = function () { if (me.paused) return; waiters = waiters.filter(function (w) { if (i >= w.upto) { w.res({ playedMs: 1000 }); return false; } return true; }); if (i >= lines.length) { cur = null; ttsState('idle', 'completed'); return; } var l = lines[i]; tl.line.forEach(function (f) { f({ line: i, id: l.id }); }); i++; t = setTimeout(me.go, window.__ttsLineMs || 250); };
         me.pause = function () { me.paused = true; clearTimeout(t); ttsState('paused'); };
         me.resume = function () { me.paused = false; ttsState('speaking'); me.go(); };
         cur = me; ttsState('starting'); setTimeout(function () { ttsState('speaking'); me.go(); }, 10);
       });
     },
-    add: function (l) { return tts.speak(l); },
+    add: function (l, o) { return tts.speak(l, o, true); },
     stop: function () { window.__mock.ttsStops = (window.__mock.ttsStops || 0) + 1; if (cur) cur.end('stopped'); return Promise.resolve(); },
     pause: function () { if (cur) cur.pause(); return Promise.resolve(); },
     resume: function () { if (cur) cur.resume(); return Promise.resolve(); },
