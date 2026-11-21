@@ -1012,6 +1012,14 @@ body.ts-on .fab-wrap { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .vd-ask-opts { display: grid; gap: 8px; } .vd-ask-opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 9px 12px; font-size: 14.5px; cursor: pointer; }
 .vd-ask-opt span { font-weight: 700; color: var(--muted); } .vd-ask-opt:hover:not(:disabled) { background: var(--hover); } .vd-ask-opt.right { border-color: var(--case); background: var(--case-bg); } .vd-ask-opt.wrong { border-color: var(--danger); background: var(--danger-soft); } .vd-ask-opt:disabled { cursor: default; opacity: 1; }
 .vd-ask-fb { margin-top: 10px; font-size: 14.5px; line-height: 1.5; } .vd-ask-fb.ok { color: var(--good); } .vd-ask-fb.bad { color: var(--danger); } .vd-ask-go { margin-top: 10px; } .vd-ask-hint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.vd-chat { display: flex; gap: 8px; margin-top: 12px; } .vd-chat .input { flex: 1; min-width: 0; }
+.vd-chat-out { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.vd-chat-lbl { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.vd-chat-card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 13.5px; } .vd-chat-card p { margin: 4px 0 0; }
+.vd-chat-ans { border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 14.5px; line-height: 1.55; } .vd-chat-ans p { margin: 4px 0; }
+.vd-chat-note { font-size: 12px; }
+.vd-pool-head { font-size: 13px; margin-bottom: 6px; } .vd-pool-list { max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.vd-pool-card { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; } .vd-pool-card small { display: block; color: var(--muted); font-size: 11.5px; } .vd-pool-card input { margin-top: 3px; }
 .vd-ctl { margin-top: 8px; } .vd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .vd-dots { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: 6px; }
 .vd-dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--muted); background: none; padding: 0; cursor: pointer; }

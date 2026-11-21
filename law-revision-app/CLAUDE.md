@@ -79,6 +79,19 @@ lecture notes, review progress, quiz levels) lives in that artifact's claude.ai 
   law to the made-up example. Playback stops after the next quiz scene (`vd.stopAt`, `vdSegmentEnd`), `vdAsk` shows the options
   under the picture, marks the answer, reads `explain` aloud, and Continue plays on. Ignore tts idle reasons 'replaced'/'stopped'
   (the app's own); never use a time-based guard for that (it swallowed real "completed" events).
+  Script prompt = an expert lecturer persona with a teaching arc (hook → big picture → intuition → rule → cases as evidence of
+  reasoning → edges/misconceptions → apply → takeaway), a "plan" field filled first, and STAY ON TOPIC with an "offTopic" id list
+  (off-topic cards are left out of coverage and shown as "N off-topic cards left out"). Concept search (`vdConceptCards`) ignores
+  filler words (`VD_FILLER`: "act", "law", "case"… — "misrepresentation act" used to pull in the Parliament Acts), stems words, needs
+  every real word to match and keeps to the dominant topics; the form lists the cards with tick boxes (`vd.excluded`).
+  Paces: Slow 0.7 / Tutor 0.78 (default) / Relaxed 0.88 / Brisk 1; breaths ≤170 chars. DRAWING FOLLOWS THE VOICE: `vdBeats` splits a
+  scene's drawing order into one part per breath; only part 0 starts, `vdBeat(n)` runs part n when breath n starts (tts onLine
+  `s<i>_<n>`, phone voice line start, or timers in captions mode), so pausing the voice stops the drawing (plus the `.paused` CSS).
+  Platform pause/resume (onState paused/speaking) is mirrored into `vd.paused`. Extra kinds: diagram (flow/cycle/hub), scales,
+  timeline, venn; case panels can hold a character with a mood and a speech bubble; principle `key` words on a highlighted tag.
+  Chat bar (`src/js_vdchat.js`): "Search my cards" is free and local (`vdSearch`: stemmed tokens over all cards, name/topic weighted,
+  video and scene cards boosted); "Explain it to me" = ONE quick-tier request with the question, the current narration and only
+  those cards ("VIDEO TUTOR QUESTION"), optional read-aloud.
   No tts (Safari, mobile apps, outside-org viewers, offline copy) → a clear note and captions with timed auto-advance. The owner
   explicitly does NOT want the device/browser voice. Coverage check (free, local, `vdCoverage`): every card must appear — a case only
   counts if its name is said or shown; missing ones get scenes built from the card's facts/rule/exam use (`auto`), before the recap;

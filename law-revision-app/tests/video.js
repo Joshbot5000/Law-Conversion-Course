@@ -27,17 +27,18 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.click('.vd-sty[data-s="papercraft"]');
   await page.selectOption('#vdTopic', 'contract|Promissory Estoppel');
   const poolTxt = await page.textContent('#vdPool');
-  ok(/Made from 4 cards/.test(poolTxt) && /Combe v Combe/.test(poolTxt), 'shows which of your cards it will use: ' + poolTxt.slice(0, 60));
+  ok(/will teach <b>4 cards<\/b>|will teach 4 cards/.test(poolTxt) && /Combe v Combe/.test(poolTxt), 'shows which of your cards it will use: ' + poolTxt.slice(0, 60));
   await page.click('[data-vd="make"]');
   await page.waitForSelector('#vdStage svg', { timeout: 20000 });
   const ps = await calls();
   ok(ps.length === 1, 'ONE Claude request for the whole video');
   const p = ps[0];
-  ok(/Cover EVERY card/.test(p) && /Never invent a case/.test(p) && /clearly made up/.test(p) && /proper little story/.test(p) && /say every case.s name aloud/.test(p), 'prompt: only your cards, every card, cases as full stories, the example clearly made up');
-  ok(/ELI5 analogy/.test(p) && /why it exists or why it matters/.test(p) && /when it applies and when it does not/.test(p), 'prompt: every principle explained in layers (rule, analogy, why, when, sum-up)');
-  ok(/Calm and unhurried/.test(p) && /warm, patient, encouraging/.test(p) && /QUIZ CHECK-INS: exactly 1/.test(p) && /applies what they have just learnt to the made-up example/.test(p) && /never say the answer in the narration/.test(p), 'prompt: calm, warm tutor; a quiz check-in applying the law to the example');
-  ok(/favourite law tutor/.test(p) && /write for the ear/.test(p), 'prompt: warm human tutor voice, written to be spoken');
-  ok(/Combe v Combe/.test(p) && /550-750 words of narration IN TOTAL/.test(p), 'cards and a word budget (about 4-5 minutes) are in the prompt');
+  ok(/Cover every on-topic card/.test(p) && /never invent a case/.test(p) && /clearly made up/.test(p) && /say every case.s name aloud/.test(p), 'prompt: only your cards, every on-topic card, the example clearly made up');
+  ok(/Rule second, understanding first/.test(p) && /everyday analogy/.test(p) && /when the rule does not apply/.test(p), 'prompt: builds understanding first, analogies, and the edges of each rule');
+  ok(/Calm and unhurried/.test(p) && /QUIZ CHECK-INS: exactly 1/.test(p) && /how that law applies to the made-up example/.test(p) && /never give the answer away/.test(p), 'prompt: calm, warm tutor; a quiz check-in applying the law to the example');
+  ok(/outstanding law lecturer/.test(p) && /broad and deep command/.test(p) && /write for the ear/.test(p) && /WHY the court decided/.test(p) && /misconceptions/.test(p) && /THINK FIRST/.test(p), 'prompt: an expert teacher who explains the why, plans first, flags misconceptions');
+  ok(/STAY ON TOPIC/.test(p) && /offTopic/.test(p), 'prompt: stays strictly on the topic and lists any off-topic cards');
+  ok(/Combe v Combe/.test(p) && /500-650 words of narration in total/.test(p), 'cards and a word budget (about 4-5 minutes) are in the prompt');
   const call = await page.evaluate(() => window.__mock.calls.find(c => typeof c.input === 'string' && c.input.includes('EXPLAINER')).opts);
   ok(call.modelTier === 'default', 'uses the standard model tier (not the most expensive)');
 
@@ -67,7 +68,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.waitForFunction(() => window.__mock.tts && window.__mock.tts.length >= 2);
   const sp = await page.evaluate(() => ({ lines: window.__mock.tts.flatMap(t => t.lines), opts: window.__mock.tts[0].opts, first: window.__mock.tts[0].lines.map(l => l.id), added: window.__mock.tts[1].added }));
   ok(sp.first[0] === 's0_0' && sp.first.every(id => /^s0_/.test(id)) && sp.added && sp.lines.every(l => l.len <= 300 && l.voice === 'buttery'), 'the Claude voice gets a scene at a time, each in short breaths');
-  ok(sp.opts.rate === 0.85, 'starts at a calm tutor pace (0.85)');
+  ok(sp.opts.rate === 0.78, 'starts at a calm tutor pace (0.78)');
   await page.waitForFunction(() => /^3 \/ 11$/.test(document.querySelector('#vdStage .vd-count').textContent), null, { timeout: 8000 });
   ok(true, 'scenes change as the voice reaches each one');
   await page.click('[data-vd="pause"]');
@@ -75,14 +76,16 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   const atPause = await page.textContent('#vdStage .vd-count'); await page.waitForTimeout(900);
   ok(atPause === await page.textContent('#vdStage .vd-count'), 'nothing moves while paused');
   await page.click('[data-vd="pause"]');
-  await page.selectOption('#vdRate', '1.15');
-  ok(await page.evaluate(() => window.__mock.rate === 1.15), 'speed control changes the pace');
+  await page.selectOption('#vdRate', '0.88');
+  ok(await page.evaluate(() => window.__mock.rate === 0.88), 'speed control changes the pace');
   await page.click('.vd-dot[data-i="8"]');
   await page.waitForFunction(() => window.__mock.tts.filter(t => !t.added).length === 2);
   await page.waitForTimeout(700);
   ok(/Pause/.test(await page.textContent('#vdCtl')) && await page.evaluate(() => window.claude && true), 'jumping to another scene keeps the Pause button working (the old reading ending is ignored)');
   await page.click('#vdStage');
   ok(await page.$('#vdStage.paused') && /Resume/.test(await page.textContent('#vdCtl')), 'clicking the picture pauses');
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => { const st = document.querySelector('#vdStage'); return document.getAnimations().filter(a => a.effect && a.effect.target && st.contains(a.effect.target) && a.playState === 'running' && getComputedStyle(a.effect.target).animationPlayState !== 'paused').length === 0; }), 'while paused, nothing on the picture keeps drawing');
   await page.keyboard.press('Space');
   ok(!(await page.$('#vdStage.paused')) && /Pause/.test(await page.textContent('#vdCtl')), 'the space bar resumes');
   ok(await page.evaluate(() => window.__mock.tts.filter(t => !t.added)[1].lines[0].id === 's8_0'), 'clicking a scene plays from there');
@@ -115,6 +118,15 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   ok(/Pause/.test(await page.textContent('#vdCtl')), 'if the voice refuses a part anyway, the video keeps going with captions instead of getting stuck');
   await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
   await page.evaluate(() => { window.__ttsMaxChars = 0; window.__ttsLineMs = 400; });
+  // 4c. Ask about the video: free search of all cards, then an optional small tutor answer
+  await page.click('[data-vd="stop"]', { timeout: 1500 }).catch(() => {});
+  const calls0 = await page.evaluate(() => window.__mock.calls.length);
+  await page.fill('#vdChatQ', 'can a promise be used as a sword to sue?'); await page.press('#vdChatQ', 'Enter');
+  await page.waitForSelector('.vd-chat-card');
+  ok(/Combe v Combe/.test(await page.textContent('#vdChatOut')) && await page.evaluate(n => window.__mock.calls.length === n, calls0), 'the chat finds the right card across your library, for free');
+  await page.click('[data-vd="chatask"]'); await page.waitForSelector('.vd-chat-ans');
+  const chatCall = await page.evaluate(() => window.__mock.calls.at(-1));
+  ok(/shield, not a sword/.test(await page.textContent('.vd-chat-ans')) && chatCall.opts.modelTier === 'quick' && /Combe v Combe/.test(chatCall.input) && /What you were just saying/.test(chatCall.input), 'Explain it to me: one small request using only those cards and what the video was saying');
   // 4b. Styles: any style, switched while watching, at no cost
   const before = (await calls()).length;
   for (const st of ['watercolour', 'papercraft', 'anime', 'retro', 'chalkboard', 'whiteboard']) {
@@ -153,21 +165,36 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   // 6. A concept instead of a topic
   await page.click('#vdBtn'); await page.click('[data-vd="list"]').catch(() => {}); await page.click('[data-vd="new"]');
   await page.click('[data-vd="mode"][data-m="concept"]'); await page.fill('#vdConcept', 'acceptance');
-  await page.waitForFunction(() => /Made from \d+ card/.test(document.querySelector('#vdPool').textContent));
+  await page.waitForFunction(() => /will teach \d+ card/.test(document.querySelector('#vdPool').textContent));
   ok(/Hyde v Wrench|Felthouse|Adams v Lindsell|Entores/.test(await page.textContent('#vdPool')), 'typing a concept finds the matching cards');
+  await page.fill('#vdConcept', 'misrepresentation act');
+  await page.waitForTimeout(500);
+  const mis = await page.$$eval('[data-vdcard]', l => l.map(x => x.closest('label').textContent));
+  ok(mis.length === 3 && mis.every(t => /Misrepresentation/.test(t)) && !mis.some(t => /Jackson|Parliament|Theft/.test(t)), '"misrepresentation act" finds only the misrepresentation cards (not the Parliament Acts or other Acts): ' + mis.length);
+  await page.uncheck('[data-vdcard]:first-of-type'); await page.waitForTimeout(100);
+  ok(/will teach 2 cards/.test(await page.textContent('#vdPool')), 'you can untick a card to leave it out');
   await page.keyboard.press('Escape');
 
   // 7. Backup
   await page.click('#exportBtn'); await page.waitForFunction(() => window.__mock.saved && /backup/.test(window.__mock.saved.filename), null, { timeout: 10000 });
   ok(await page.evaluate(() => (JSON.parse(window.__mock.saved.data).videos || []).length === 1), 'backup includes your videos');
 
+  // 7a. More kinds of picture: diagrams, scales, timelines, overlapping circles; people in case panels
+  await page.evaluate(() => { window.__vdKinds = true; });
+  await page.click('#vdBtn'); await page.click('[data-vd="list"]', { timeout: 1500 }).catch(() => {}); await page.click('[data-vd="new"]');
+  await page.click('[data-vd="mode"][data-m="topic"]'); await page.click('[data-vd="len"][data-l="quick"]'); await page.selectOption('#vdTopic', 'contract|Promissory Estoppel'); await page.click('[data-vd="make"]');
+  await page.waitForSelector('#vdStage svg', { timeout: 20000 });
+  for (const st of ['whiteboard', 'anime']) { await page.selectOption('#vdStyle', st); for (const i of [2, 3, 4, 5, 6, 8]) { await page.click('.vd-dot[data-i="' + i + '"]'); await page.waitForTimeout(60); await page.evaluate(() => document.getAnimations().forEach(a => a.finish())); await page.locator('#vdStage').screenshot({ path: path.join(T, 'vd_kind_' + st + i + '.png') }); } }
+  ok(await page.$$eval('#vdStage .vd-ink', l => l.length) > 30, 'diagrams, scales, timelines and overlapping circles are drawn');
+  await page.evaluate(() => { window.__vdKinds = false; });
+  await page.keyboard.press('Escape');
   // 7b. A full lesson that comes back over 12 minutes is tightened (one extra request, only then)
   await page.evaluate(() => { window.__vdLong = true; window.__mock.calls = []; window.__mock.shortened = 0; });
   await page.click('#vdBtn'); await page.click('[data-vd="list"]', { timeout: 1500 }).catch(() => {}); await page.click('[data-vd="new"]');
   await page.click('[data-vd="mode"][data-m="topic"]'); await page.click('[data-vd="len"][data-l="full"]'); await page.selectOption('#vdTopic', 'contract|Promissory Estoppel'); await page.click('[data-vd="make"]');
   await page.waitForSelector('#vdStage svg', { timeout: 20000 });
   const fp = (await calls())[0];
-  ok(/1,250-1,550 words/.test(fp) && /never more than 1,550, so it stays within 12 minutes; quiz scenes do not count/.test(fp) && /QUIZ CHECK-INS: 2 or 3 \(never more\)/.test(fp), 'full lesson: 12-minute budget (quizzes not counted) and 2-3 quiz check-ins');
+  ok(/1,150-1,400 words/.test(fp) && /not counting quiz scenes \(never more than 1,400\)/.test(fp) && /QUIZ CHECK-INS: 2 or 3 \(never more\)/.test(fp), 'full lesson: 12-minute budget (quizzes not counted) and 2-3 quiz check-ins');
   const mins = +/about (\d+) min/.exec(await page.textContent('.vd-head'))[1];
   ok(await page.evaluate(() => window.__mock.shortened === 1 && window.__mock.calls.filter(c => typeof c.input === 'string' && /EXPLAINER VIDEO (SCRIPT|SHORTEN)/.test(c.input)).length === 2) && mins <= 12, 'a script over 12 minutes is tightened before you see it (now about ' + mins + ' min)');
   await page.evaluate(() => { window.__vdLong = false; });

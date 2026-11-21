@@ -343,6 +343,7 @@
       S.rect(270, 150, 940, 230, { fill: T.fill === 'hatch' ? null : (T.note.charAt(0) === '#' ? P[3] : pen), light: 0.8, at: at() });
       if (T.fill !== 'hatch') S.solid('M' + 740 + ' 150 m-11 0 a11 11 0 1 0 22 0 a11 11 0 1 0 -22 0', P[0], { at: k - 1 });
       tx(V.rule, 300, 265, { size: 46, chars: 40, mid: true, at: at() });
+      if (V.key) { var kw = Math.min(520, V.key.length * 20 + 60); S.mark(1210 - kw, 128, kw, 46, T.mark, at()); tx('Key: ' + V.key, 1210 - kw + 16, 160, { size: 30, chars: 40, title: true, at: k - 1 }); }
       var pts = V.points, pw = pts.length ? Math.min(330, (1140 - (pts.length - 1) * 30) / pts.length) : 0;
       pts.forEach(function (p, i) {
         var x = 70 + i * (pw + 30) + (1140 - pts.length * pw - (pts.length - 1) * 30) / 2;
@@ -362,6 +363,64 @@
         tx(s.label, x + sw / 2, 450, { size: 36, chars: Math.max(9, Math.round(sw / 18)), anchor: 'middle', mid: true, at: at() });
         if (i < st.length - 1) vdArrow(S, x + sw + 6, 450, x + sw + 44, 450, { color: T.ink, w: 3, at: at() });
       });
+    } else if (K === 'diagram') {
+      // Ideas as linked bubbles: a flow along a gentle wave, a cycle, or a hub with spokes.
+      var nd = V.nodes, nn = nd.length, pos = [], R = nn > 4 ? 70 : 82;
+      nd.forEach(function (n2, i) {
+        if (V.layout === 'hub') { var a0 = -Math.PI / 2 + Math.PI / Math.max(1, nn - 1), an = a0 + (i - 1) * 2 * Math.PI / (nn - 1); pos.push(i === 0 ? [640, 395] : [640 + Math.cos(an) * 450, 395 + Math.sin(an) * 185]); }
+        else if (V.layout === 'cycle') pos.push([640 + Math.cos(-Math.PI / 2 + i * 2 * Math.PI / nn) * 400, 410 + Math.sin(-Math.PI / 2 + i * 2 * Math.PI / nn) * 205]);
+        else pos.push([140 + i * (1000 / Math.max(1, nn - 1)), 400 + (i % 2 ? 70 : -50)]);
+      });
+      var links = V.links.length ? V.links : nd.slice(1).map(function (x, i) { return V.layout === 'hub' ? { from: 0, to: i + 1, label: '' } : { from: i, to: i + 1, label: '' }; }).concat(V.layout === 'cycle' && nn > 2 ? [{ from: nn - 1, to: 0, label: '' }] : []);
+      nd.forEach(function (n2, i) {
+        var p = pos[i], r = V.layout === 'hub' && i === 0 ? R + 22 : R, col = pc(i);
+        S.ellipse(p[0], p[1], r, r, { color: col, fill: col, light: 0.72, w: 3.5, at: at() });
+        S.icon(n2.icon, p[0] - r * 0.6, p[1] - r * 0.75, r * 1.2, { color: col, at: k - 1 });
+        tx(n2.label, p[0], p[1] + r + 34, { size: 28, chars: 16, anchor: 'middle', title: true, at: k - 1 });
+        links.filter(function (l) { return l.to === i; }).forEach(function (l) {
+          var a = pos[l.from], b = pos[l.to], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1;
+          var ra = V.layout === 'hub' && l.from === 0 ? R + 26 : R + 6, rb = r + 10;
+          var x1 = a[0] + dx / len * ra, y1 = a[1] + dy / len * ra, x2 = b[0] - dx / len * rb, y2 = b[1] - dy / len * rb;
+          vdArrow(S, x1, y1, x2, y2, { color: T.sub, w: 3, at: at() }, len * 0.12);
+          if (l.label) { var mx = (x1 + x2) / 2 - dy / len * 30, my = (y1 + y2) / 2 + dx / len * 30; S.mark(mx - l.label.length * 7 - 8, my - 24, l.label.length * 14 + 16, 34, T.mark, k - 1); tx(l.label, mx, my, { size: 22, anchor: 'middle', at: k - 1 }); }
+        });
+      });
+    } else if (K === 'scales') {
+      // A balance that tips towards the heavier side.
+      var tilt = V.tips === 'left' ? 46 : V.tips === 'right' ? -46 : 0, lx = 260, rx = 1020, ly = 250 + tilt, ry = 250 - tilt;
+      S.line(640, 650, 640, 236, { w: 5, at: at() }); S.poly([560, 660, 720, 660, 640, 618], true, { fill: T.sub, light: 0.4, at: k - 1 });
+      S.ellipse(640, 232, 16, 16, { fill: P[0], light: 0.2, at: k - 1 });
+      S.line(lx, ly, rx, ry, { w: 6, at: at() });
+      [[V.left, lx, ly, 0], [V.right, rx, ry, 2]].forEach(function (sd) {
+        var side = sd[0], x = sd[1], y = sd[2], col = pc(sd[3]);
+        S.line(x, y, x - 120, y + 170, { color: T.sub, w: 2.4, once: true, at: at() }); S.line(x, y, x + 120, y + 170, { color: T.sub, w: 2.4, once: true, at: k - 1 });
+        S.ellipse(x, y + 176, 170, 30, { color: col, fill: col, light: 0.6, w: 3.5, at: k - 1 });
+        tx(side.title, x, y - 26, { size: 34, chars: 20, anchor: 'middle', title: true, color: col, at: k - 1 });
+        side.points.forEach(function (pt, j2) { tx('• ' + pt, x - 150, y + 240 + j2 * 40, { size: 26, chars: 26, at: at() }); });
+      });
+      if (V.caption) { tx(V.caption, 640, 700, { size: 28, chars: 70, anchor: 'middle', color: T.sub, at: at() }); }
+    } else if (K === 'timeline') {
+      // A road through time: dates on the line, each event drawn above or below in turn.
+      var ev = V.events, ne = ev.length, gap = 1040 / Math.max(1, ne - 1);
+      vdArrow(S, 80, 420, 1210, 420, { w: 4, at: at() });
+      ev.forEach(function (e2, i) {
+        var x = 120 + i * gap, up = i % 2 === 0, col = pc(i);
+        S.ellipse(x, 420, 15, 15, { color: col, fill: col, light: 0.2, at: at() });
+        if (e2.when) tx(e2.when, x, up ? 466 : 396, { size: 26, anchor: 'middle', title: true, color: col, at: k - 1 });
+        S.icon(e2.icon, x - 48, up ? 190 : 520, 96, { color: col, at: at() });
+        tx(e2.label, x, up ? 320 : 650, { size: 25, chars: Math.max(12, Math.round(gap / 15)), anchor: 'middle', mid: true, at: k - 1 });
+        S.line(x, up ? 380 : 440, x, up ? 350 : 500, { color: col, w: 2, once: true, at: k - 1 });
+      });
+    } else if (K === 'venn') {
+      // Two look-alike ideas: what's only in each, and what they share.
+      S.ellipse(500, 420, 260, 220, { color: pc(0), fill: pc(0), light: 0.78, w: 4, at: at() });
+      S.ellipse(780, 420, 260, 220, { color: pc(2), fill: pc(2), light: 0.78, w: 4, at: at() });
+      tx(V.left.title, 400, 186, { size: 36, chars: 18, anchor: 'middle', title: true, color: pc(0), at: k - 1 });
+      tx(V.right.title, 880, 186, { size: 36, chars: 18, anchor: 'middle', title: true, color: pc(2), at: k - 1 });
+      V.left.points.forEach(function (pt, j2) { tx(pt, 380, 330 + j2 * 62, { size: 25, chars: 15, anchor: 'middle', mid: true, at: at() }); });
+      V.right.points.forEach(function (pt, j2) { tx(pt, 900, 330 + j2 * 62, { size: 25, chars: 15, anchor: 'middle', mid: true, at: at() }); });
+      V.both.forEach(function (pt, j2) { tx(pt, 640, 360 + j2 * 62, { size: 24, chars: 12, anchor: 'middle', mid: true, title: true, at: at() }); });
+      if (V.both.length) tx('both', 640, 300, { size: 24, anchor: 'middle', color: T.sub, at: k - 1 });
     } else if (K === 'case') {
       var nm = V.name + (V.year ? ' (' + V.year + ')' : '');
       S.poly([64, 150, 300, 150, 330, 128, 520, 128, 540, 150], false, { color: pen, w: 2.6, at: at() });
@@ -374,7 +433,11 @@
         S.ellipse(x + 28, 268, 20, 20, { color: col, fill: col, light: 0.5, once: true, at: k - 1 });
         tx(String(i + 1), x + 28, 281, { size: 30, anchor: 'middle', title: true, at: k - 1 });
         tx(heads[i] || '', x + 58, 280, { size: 30, color: col, at: at() });
-        S.icon(p.icon, x + pw2 / 2 - 75, 304, 150, { color: col, at: at() });
+        if (p.character) {
+          S.icon(p.character.icon, x + 24, 318, 140, { color: col, mood: p.character.mood || 'thinking', at: at(), idx: i });
+          S.icon(p.icon, x + pw2 - 124, 400, 100, { color: col, at: k - 1 });
+        } else S.icon(p.icon, x + pw2 / 2 - 75, 304, 150, { color: col, at: at() });
+        if (p.says) { var bwid = Math.max(140, Math.min(p.character ? pw2 - 190 : pw2 - 40, p.says.length * 12 + 60)); S.ellipse(x + pw2 - bwid / 2 - 14, 350, bwid / 2, 34, { fill: '#ffffff', light: 0, color: T.ink, w: 2, once: true, at: at() }); tx('“' + p.says + '”', x + pw2 - bwid / 2 - 14, 356, { size: 22, chars: Math.round(bwid / 11), anchor: 'middle', mid: true, at: k - 1 }); }
         tx(p.label, x + pw2 / 2, 548, { size: 34, chars: Math.max(12, Math.round(pw2 / 18)), anchor: 'middle', mid: true, at: at() });
         if (i < pn - 1) vdArrow(S, x + pw2 + 6, 440, x + pw2 + 44, 440, { w: 3, at: at() });
       });

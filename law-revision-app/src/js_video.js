@@ -14,10 +14,10 @@
      ------------------------------------------------------------------ */
   var VD_KEY = 'lawRevisionApp.v1.videos';
   var VD_MAX_CARDS = 40;
-  var VD_KINDS = ['title', 'hypo', 'principle', 'steps', 'case', 'roundup', 'compare', 'quiz', 'apply', 'recap'];
+  var VD_KINDS = ['title', 'hypo', 'principle', 'steps', 'diagram', 'scales', 'timeline', 'venn', 'case', 'roundup', 'compare', 'quiz', 'apply', 'recap'];
   var VD_VOICES = { buttery: 'Warm', airy: 'Light', glassy: 'Clear', rounded: 'Soft' };
-  var VD_RATES = [[0.75, 'Slow'], [0.85, 'Tutor pace'], [1, 'Normal'], [1.15, 'Brisk']];
-  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, voice: 'buttery', pvOn: false, pvVoice: 'bf_emma', pvTok: 0, rate: 0.85, style: 'whiteboard', view_style: '', cc: true, unsub: [] };
+  var VD_RATES = [[0.7, 'Slow'], [0.78, 'Tutor pace'], [0.88, 'Relaxed'], [1, 'Brisk']];
+  var vd = { view: 'list', mode: 'topic', topic: '', concept: '', length: 'quick', job: null, cur: null, scene: 0, playing: false, paused: false, timer: null, tts: null, ttsTried: false, ttsReady: false, voice: 'buttery', excluded: {}, beatTimers: [], pvOn: false, pvVoice: 'bf_emma', pvTok: 0, rate: 0.78, style: 'whiteboard', view_style: '', cc: true, unsub: [] };
   state.videos = [];
 
   /* ---- storage ---- */
@@ -29,7 +29,8 @@
       v: 1, id: v.id.replace(/[^A-Za-z0-9_\-]/g, '-').slice(0, 80), title: s_(v.title, 160) || 'Explainer', topic: s_(v.topic, 200), module: MODULE_LABEL[v.module] ? v.module : '',
       length: v.length === 'full' ? 'full' : 'quick', style: VD_STYLES[v.style] ? v.style : 'whiteboard', createdAt: v.createdAt && !isNaN(new Date(v.createdAt).getTime()) ? v.createdAt : nowISO(), seed: Math.round(num(v.seed, 7)) || 7,
       cardIds: (Array.isArray(v.cardIds) ? v.cardIds : []).map(function (x) { return s_(x, 120); }).filter(Boolean).slice(0, 80),
-      coverage: v.coverage && typeof v.coverage === 'object' ? { cards: num(v.coverage.cards, 0), covered: num(v.coverage.covered, 0), added: num(v.coverage.added, 0), flagged: num(v.coverage.flagged, 0) } : { cards: 0, covered: 0, added: 0, flagged: 0 },
+      coverage: v.coverage && typeof v.coverage === 'object' ? { cards: num(v.coverage.cards, 0), covered: num(v.coverage.covered, 0), added: num(v.coverage.added, 0), flagged: num(v.coverage.flagged, 0), offTopic: num(v.coverage.offTopic, 0) } : { cards: 0, covered: 0, added: 0, flagged: 0, offTopic: 0 },
+      skipped: arr(v.skipped, 40, 200),
       scenes: scenes
     };
   }
@@ -79,20 +80,39 @@
   function vdPool() {
     var cards;
     if (vd.mode === 'topic') cards = state.entries.filter(function (e) { return topicKey(e) === vd.topic && (e.ratio || e.facts); });
-    else {
-      var words = normText(vd.concept).split(' ').filter(function (w) { return w.length >= 3; });
-      if (!words.length) return [];
-      cards = state.entries.map(function (e) {
-        var name = normText(e.name + ' ' + e.topic + ' ' + (e.tags || []).join(' ')), body = normText(e.ratio + ' ' + e.facts);
-        var sc = 0; words.forEach(function (w) { if (name.indexOf(' ' + w) !== -1) sc += 3; else if (body.indexOf(' ' + w) !== -1) sc += 1; });
-        return { e: e, sc: sc };
-      }).filter(function (x) { return x.sc >= Math.max(2, words.length); }).sort(function (a, b) { return b.sc - a.sc; }).map(function (x) { return x.e; });
-    }
+    else cards = vdConceptCards(vd.concept);
     // Same case twice (duplicates) → once.
     var seen = {};
     cards = cards.filter(function (e) { var k = normText(e.name); if (seen[k]) return false; seen[k] = true; return true; });
     cards.sort(function (a, b) { return (b.key ? 1 : 0) - (a.key ? 1 : 0) || (a.type === 'case' ? 1 : 0) - (b.type === 'case' ? 1 : 0); });
-    return cards.slice(0, VD_MAX_CARDS);
+    return cards.filter(function (e) { return !vd.excluded[e.id]; }).slice(0, VD_MAX_CARDS);
+  }
+  function vdPoolHTML() {
+    var all = vdPoolAll(), used = all.filter(function (e) { return !vd.excluded[e.id]; }).length;
+    if (!all.length) return vd.mode === 'topic' ? 'Choose a topic to see which cards it uses.' : (vd.concept.trim() ? 'No cards match that — try other words.' : 'Type a concept to find matching cards.');
+    return '<div class="vd-pool-head">The video will teach <b>' + plural(used, 'card') + '</b>. Untick any that aren\'t what you want:</div><div class="vd-pool-list">' +
+      all.map(function (e) { return '<label class="vd-pool-card"><input type="checkbox" data-vdcard="' + esc(e.id) + '"' + (vd.excluded[e.id] ? '' : ' checked') + '><span><b>' + esc(e.name) + '</b><small>' + esc(MODULE_LABEL[e.module] + ' · ' + e.topic) + '</small></span></label>'; }).join('') + '</div>' +
+      (used > 14 && vd.length === 'quick' ? '<p class="warn">That\'s a lot for a refresher; a full lesson gives each case more room.</p>' : '');
+  }
+  function vdPoolAll() { var keep = vd.excluded; vd.excluded = {}; var all = vdPool(); vd.excluded = keep; return all; }
+  // Words that say nothing about which law you mean ("act" matched the Theft Act and the Parliament Acts).
+  var VD_FILLER = ' act acts the of and law laws case cases rule rules test tests section sections s v vs in on a an to for what is are how why when explain about principle principles doctrine concept topic module 1 2 3 '.split(' ').reduce(function (o, w) { if (w) o[w] = 1; return o; }, {});
+  function vdStem(w) { return w.length > 5 ? w.replace(/(ations?|ments?|ings?|ness|ive|ed|es|s)$/, '') : w; }
+  function vdConceptCards(text) {
+    var words = normText(text).split(' ').filter(function (w) { return w.length >= 3 && !VD_FILLER[w]; }).map(vdStem);
+    if (!words.length) return [];
+    var scored = state.entries.map(function (e) {
+      var head = ' ' + normText(e.name + ' ' + e.topic + ' ' + (e.tags || []).join(' ')).split(' ').map(vdStem).join(' ') + ' ', body = ' ' + normText(e.ratio + ' ' + e.facts).split(' ').map(vdStem).join(' ') + ' ';
+      var hits = 0, sc = 0; words.forEach(function (w) { var h = head.indexOf(' ' + w) !== -1, b = body.indexOf(' ' + w) !== -1; if (h || b) hits++; sc += h ? 3 : b ? 1 : 0; });
+      return { e: e, hits: hits, sc: sc };
+    });
+    // Every real word must match (in the card's name or topic, or its text); a card that only mentions them in passing isn't enough.
+    var all = scored.filter(function (x) { return x.hits === words.length && x.sc >= words.length * 2; });
+    if (!all.length) all = scored.filter(function (x) { return x.hits === words.length; });
+    // Keep to the topics most of the matches come from, so one stray card can't drag the video off course.
+    var byTopic = {}; all.forEach(function (x) { var k = topicKey(x.e); byTopic[k] = (byTopic[k] || 0) + x.sc; });
+    var best = Math.max.apply(null, Object.keys(byTopic).map(function (k) { return byTopic[k]; }).concat([0]));
+    return all.filter(function (x) { return byTopic[topicKey(x.e)] >= best * 0.25 || x.sc >= words.length * 3; }).sort(function (a, b) { return b.sc - a.sc; }).map(function (x) { return x.e; });
   }
 
   /* ---- the script: ONE request ---- */
@@ -101,40 +121,49 @@
     var q = length === 'quick';
     return [
       'EXPLAINER VIDEO SCRIPT',
-      'You are the student\'s favourite law tutor: warm, patient, encouraging and genuinely enthusiastic. You are recording an animated explainer video for a law conversion (PGDL) student on: ' + label + '. The goal is that they truly GET it, explained like they are five (ELI5), not just hear it.',
-      'HOW YOU SPEAK (this is read aloud by a natural voice, so write for the ear):',
-      '- Calm and unhurried. Short sentences, one idea at a time. Leave breathing space with full stops and commas. Never cram.',
-      '- Talk to "you" directly, like sitting next to them: "Here\'s the key bit.", "Let\'s slow down here.", "Stay with me, this is the clever part.", "Nice, you\'ve got that."',
-      '- Signpost: say where we are going, then go there, then sum it up in one line before moving on ("So, in a nutshell…").',
-      '- Every legal word gets an instant plain-English explanation and an everyday analogy. Contractions, a little humour, rhetorical questions ("So what did the court say?"). UK spelling. Never robotic, never a list read aloud.',
-      'EXPLAIN FULLY:',
-      '- Every principle or statute: (1) the rule in one plain sentence, (2) an ELI5 analogy from everyday life, (3) why it exists or why it matters, (4) when it applies and when it does not, (5) a one-line sum-up.',
-      '- Every case as a proper little story: who the people were and what happened (from the card\'s facts), what went wrong, what the court decided, the rule it gives us, and why it matters in an exam (from the card\'s exam use).',
-      '- Tie ideas together: show how each rule connects to the made-up example.',
+      'You are an outstanding law lecturer: a former barrister with a broad and deep command of English law, who loves teaching and explains hard things so simply that a beginner gets them (ELI5) without ever being patronising. You are recording an animated explainer video for a law conversion (PGDL) student on: ' + label + '.',
+      'STAY ON TOPIC: the whole video is about ' + label + ' and nothing else. Teach only the cards below that are genuinely about it. If a card is off topic, leave it out entirely and put its id in "offTopic". Never drift into other areas of law.',
+      'THINK FIRST: fill in "plan" before writing: the big idea in one sentence; the problem this area of law exists to solve; how the pieces fit together; the 1-3 misconceptions students most often have; the order that builds understanding best.',
+      'HOW A GREAT TEACHER EXPLAINS (follow this arc):',
+      '1. Hook: open with a small puzzle or everyday situation the law has to answer, so the student wants to know.',
+      '2. Big picture: where this sits, what problem it solves, and why the law cares, before any detail.',
+      '3. Build intuition with the made-up example, then name the rule. Rule second, understanding first.',
+      '4. Cases are evidence of how judges reason: tell each important case as a short story, then say WHY the court decided as it did and what that shows, not just the outcome.',
+      '5. Edges: when the rule does not apply, how it differs from look-alike rules, and the common mistakes ("A really common trap is…").',
+      '6. Apply it back to the example, then end with the one thing to remember and an exam tip.',
+      'HOW YOU SOUND (read aloud by a natural voice, so write for the ear):',
+      '- Like a real person talking: varied sentence length, contractions, spoken signposts ("Right.", "Now, here\'s the thing.", "Okay, so…", "Think about it like this."), questions to the listener, and the odd light moment. Never a list read aloud, never robotic.',
+      '- Calm and unhurried: one idea per sentence, short sentences for the key points so they land, a quick "in other words…" after anything tricky.',
+      '- Every legal term gets an instant plain-English meaning and an everyday analogy the first time it appears.',
+      '- Confident and precise, like someone who knows the whole subject: connect ideas, explain the reasoning and policy behind rules in general terms, and be exact about what each card says.',
       'ACCURACY RULES:',
-      '- Use ONLY the student\'s cards below for the law. Cover EVERY card: list each card\'s id in "cards" on the scene that explains it, and say every case\'s name aloud in that scene.',
-      '- Never invent a case, citation, date, fact or rule. If a card has no facts, give only its rule.',
-      '- The everyday example must be clearly made up ("Imagine…") and never presented as a real case.',
-      'STRUCTURE: a "title" scene; a "hypo" scene introducing one everyday made-up example with named characters; then the law in a sensible order ("principle" or "steps" scenes; a "case" scene per important case; "roundup" for at most 2 smaller cases at a time; "compare" to distinguish two cases); ' + (q ? 'one' : 'a') + ' "quiz" check-in' + (q ? '' : 's') + ' where the student applies what they have just learnt to the made-up example; an "apply" scene going back to the example; a "recap" scene.',
-      'QUIZ CHECK-INS: ' + (q ? 'exactly 1' : '2 or 3 (never more), spread through the lesson,') + ' each placed straight after the law it tests has been taught. Each asks how that law applies to the made-up example\'s characters (a short twist on the scenario is fine), with 3 or 4 plausible options, exactly one right. The video pauses for the student to choose, then shows "explain". Its narration only sets up the question ("Time to put it into practice… Have a think, then pick your answer."); never say the answer in the narration.',
-      q ? 'LENGTH: a refresher of about 4-5 minutes at a calm pace: 550-750 words of narration IN TOTAL across all scenes except quiz scenes (never more than 750). Spend the words where they matter most: core rules and leading cases get the fullest explanation; minor cases get a sentence or two in a roundup.'
-        : 'LENGTH: a full lesson of about 10-12 minutes at a calm, unhurried pace: 1,250-1,550 words of narration IN TOTAL across all scenes except quiz scenes (never more than 1,550, so it stays within 12 minutes; quiz scenes do not count). Weigh and prioritise: core rules and leading cases get the full layered explanation; less important cases are told briefly (two or three sentences each, at most two per roundup). Never rush: cover less detail rather than speaking faster.',
-      'Narration: no brackets, no citations or report references, no bullet points, no headings. Say case names naturally ("In Donoghue versus Stevenson…"); a year only if it helps.',
-      'VISUALS: the app draws each scene as an animated illustration. Keep on-screen words SHORT (labels 1-6 words, rule up to 14 words). Pick lively, specific icons that match the story. Shapes by kind:',
+      '- Every specific rule, case, statute section, fact or outcome must come from the cards below. General explanation of why a rule exists or how ideas connect is fine; never invent a case, citation, date, section or holding.',
+      '- Cover every on-topic card: list its id in "cards" on the scene that teaches it, and say every case\'s name aloud there.',
+      '- The everyday example is clearly made up ("Imagine…") and never presented as a real case.',
+      'SCENES: "title"; "hypo" (the made-up example, with named characters); then teaching scenes in a sensible order, choosing the clearest visual for each idea: "principle", "steps" (a test in order), "diagram" (how ideas connect), "scales" (factors weighed against each other), "timeline" (how events or the law developed), "venn" (two look-alike ideas: what is different, what is shared), "case" (one important case), "roundup" (at most 2 smaller cases), "compare"; quiz check-ins; "apply" (back to the example); "recap".',
+      'QUIZ CHECK-INS: ' + (q ? 'exactly 1' : '2 or 3 (never more), spread through the lesson,') + ' each straight after the law it tests. Each asks how that law applies to the made-up example\'s characters, with 3 or 4 plausible options, exactly one right. Its narration only sets up the question; never give the answer away.',
+      q ? 'LENGTH: about 4-5 minutes at a calm pace: 500-650 words of narration in total, not counting quiz scenes (never more than 650). Spend the words on the core rules and leading cases; minor cases get a sentence or two.'
+        : 'LENGTH: about 10-12 minutes at a calm, unhurried pace: 1,150-1,400 words of narration in total, not counting quiz scenes (never more than 1,400). Weigh and prioritise: core rules and leading cases get the full treatment; less important cases two or three sentences. Never rush: cover less detail rather than talking faster.',
+      'NARRATION AND PICTURES TOGETHER: the picture is drawn in step with the narration, a part at a time, so mention things in the same order as they appear in the visual (first point first). No brackets, citations, report references, bullet points or headings in the narration. Say case names naturally ("In Donoghue versus Stevenson…").',
+      'VISUALS: keep on-screen words SHORT (labels 1-6 words, rule up to 14 words). Pick vivid, specific icons and moods that tell the story. Shapes by kind:',
       ' title: {"kind":"title","title":"","subtitle":"","icons":["up to 3"]}',
       ' hypo: {"kind":"hypo","characters":[{"name":"","icon":"","mood":"happy|sad|surprised|thinking|worried|angry"}],"props":["up to 3 icons"],"bubble":"what a character says, up to 12 words","label":"Imagine..."}',
-      ' principle: {"kind":"principle","icon":"","rule":"","points":["2-4 short points"]}',
-      ' steps: {"kind":"steps","steps":[{"label":"","icon":""}]}  (2-5 steps of a test, in order)',
-      ' case: {"kind":"case","name":"case name exactly as on the card","year":"","panels":[{"icon":"","label":"what happened"},{"icon":"","label":"what was decided"},{"icon":"","label":"the rule"}]}',
+      ' principle: {"kind":"principle","icon":"","rule":"","key":"the 1-3 most important words of the rule, to highlight","points":["2-4 short points"]}',
+      ' steps: {"kind":"steps","steps":[{"label":"","icon":""}]}  (2-5 steps, in order)',
+      ' diagram: {"kind":"diagram","layout":"flow|cycle|hub","nodes":[{"label":"","icon":""}],"links":[{"from":0,"to":1,"label":"short"}]}  (3-6 nodes; hub = node 0 in the middle)',
+      ' scales: {"kind":"scales","left":{"title":"","points":[""]},"right":{"title":"","points":[""]},"tips":"left|right|even","caption":""}',
+      ' timeline: {"kind":"timeline","events":[{"when":"","label":"","icon":""}]}  (3-6 events)',
+      ' venn: {"kind":"venn","left":{"title":"","points":[""]},"right":{"title":"","points":[""]},"both":["what they share"]}',
+      ' case: {"kind":"case","name":"case name exactly as on the card","year":"","panels":[{"icon":"","character":{"icon":"person","mood":""},"label":"what happened","says":"optional few words a person in the story says"},{"icon":"","label":"what was decided"},{"icon":"","label":"why: the rule"}]}',
       ' roundup: {"kind":"roundup","cases":[{"name":"","label":"the rule in a few words","icon":""}]}',
       ' compare: {"kind":"compare","left":{"title":"","icon":"","points":[""]},"right":{"title":"","icon":"","points":[""]}}',
-      ' quiz: {"kind":"quiz","question":"the question, about the example\'s characters (up to 30 words)","options":["3 or 4 short options"],"answer":0,"explain":"why the right answer is right, naming the rule or case (1-3 sentences)"}',
+      ' quiz: {"kind":"quiz","question":"about the example\'s characters (up to 30 words)","options":["3 or 4 short options"],"answer":0,"explain":"why, naming the rule or case (1-3 sentences)"}',
       ' apply: {"kind":"apply","characters":[{"name":"","icon":"","mood":""}],"verdict":"short answer","good":true}',
       ' recap: {"kind":"recap","points":["3-6 short takeaways"]}',
       'ICONS (use only these names): ' + VD_ICONS_LIST + '.',
-      'Reply with ONLY JSON: {"title": "", "scenes": [{"kind": "", "heading": "short heading shown on screen", "narration": "", "cards": ["ids of the cards this scene covers"], "visual": {}}]}',
-      '', 'CARDS (id | type | name | citation | facts | rule | exam use):',
-      pool.map(function (e) { return '[' + e.id + '] ' + e.type + ' | ' + e.name + ' | ' + (e.citation || '') + ' | ' + vdClip(e.facts, 600) + ' | ' + vdClip(e.ratio, 700) + ' | ' + vdClip(e.strategy, 300); }).join('\n')
+      'Reply with ONLY JSON: {"plan": {"bigIdea": "", "problem": "", "fit": "", "misconceptions": [""], "order": ""}, "title": "", "offTopic": ["ids"], "scenes": [{"kind": "", "heading": "short heading shown on screen", "narration": "", "cards": ["ids of the cards this scene teaches"], "visual": {}}]}',
+      '', 'CARDS (id | type | name | topic | citation | facts | rule | exam use):',
+      pool.map(function (e) { return '[' + e.id + '] ' + e.type + ' | ' + e.name + ' | ' + e.topic + ' | ' + (e.citation || '') + ' | ' + vdClip(e.facts, 600) + ' | ' + vdClip(e.ratio, 700) + ' | ' + vdClip(e.strategy, 300); }).join('\n')
     ].join('\n');
   }
   function vdClip(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
@@ -148,9 +177,12 @@
     var V = o.visual, pts = function (l, n, m) { return arr(l, n, m || 90); };
     if (kind === 'title') { V.title = s_(v.title, 90) || o.heading; V.subtitle = s_(v.subtitle, 100); V.icons = (Array.isArray(v.icons) ? v.icons : []).slice(0, 3).map(function (i) { return vdIcon(i); }); }
     else if (kind === 'hypo' || kind === 'apply') { V.characters = vdCh(v.characters, 3); if (!V.characters.length) V.characters = [{ name: '', icon: 'person' }]; V.props = (Array.isArray(v.props) ? v.props : []).slice(0, 3).map(function (i) { return vdIcon(i); }); V.bubble = s_(v.bubble, 110); V.label = s_(v.label, 60); V.verdict = s_(v.verdict, 60); V.good = v.good !== false; }
-    else if (kind === 'principle') { V.icon = vdIcon(v.icon, 'scales'); V.rule = s_(v.rule, 140) || o.heading; V.points = pts(v.points, 4); }
+    else if (kind === 'principle') { V.icon = vdIcon(v.icon, 'scales'); V.rule = s_(v.rule, 140) || o.heading; V.key = s_(v.key, 40); V.points = pts(v.points, 4); }
+    else if (kind === 'diagram') { V.layout = ['flow', 'cycle', 'hub'].indexOf(v.layout) !== -1 ? v.layout : 'flow'; V.nodes = (Array.isArray(v.nodes) ? v.nodes : []).map(function (x) { return x && s_(x.label) ? { label: s_(x.label, 50), icon: vdIcon(x.icon, 'lightbulb') } : null; }).filter(Boolean).slice(0, 6); V.links = (Array.isArray(v.links) ? v.links : []).map(function (l) { return l ? { from: Math.round(num(l.from, -1)), to: Math.round(num(l.to, -1)), label: s_(l.label, 30) } : null; }).filter(function (l) { return l && l.from >= 0 && l.to >= 0 && l.from < V.nodes.length && l.to < V.nodes.length && l.from !== l.to; }).slice(0, 8); if (V.nodes.length < 2) { o.kind = V.kind = 'principle'; V.icon = 'lightbulb'; V.rule = o.heading; V.points = V.nodes.map(function (x) { return x.label; }); } }
+    else if (kind === 'scales' || kind === 'venn') { var sd = function (x) { x = x && typeof x === 'object' ? x : {}; return { title: s_(x.title, 40), points: pts(x.points, 4, 60) }; }; V.left = sd(v.left); V.right = sd(v.right); V.both = pts(v.both, 3, 60); V.tips = ['left', 'right', 'even'].indexOf(v.tips) !== -1 ? v.tips : 'even'; V.caption = s_(v.caption, 90); }
+    else if (kind === 'timeline') { V.events = (Array.isArray(v.events) ? v.events : []).map(function (x) { return x && s_(x.label) ? { when: s_(x.when, 20), label: s_(x.label, 60), icon: vdIcon(x.icon, 'calendar') } : null; }).filter(Boolean).slice(0, 6); if (V.events.length < 2) { o.kind = V.kind = 'principle'; V.icon = 'calendar'; V.rule = o.heading; V.points = V.events.map(function (x) { return x.label; }); } }
     else if (kind === 'steps') { V.steps = (Array.isArray(v.steps) ? v.steps : []).map(function (x) { return x && s_(x.label) ? { label: s_(x.label, 60), icon: vdIcon(x.icon, 'tick') } : null; }).filter(Boolean).slice(0, 5); if (V.steps.length < 2) { o.kind = V.kind = 'principle'; V.icon = 'scales'; V.rule = o.heading; V.points = []; } }
-    else if (kind === 'case') { V.name = s_(v.name, 90) || o.heading; V.year = s_(v.year, 12); V.panels = (Array.isArray(v.panels) ? v.panels : []).map(function (x) { return x && s_(x.label) ? { label: s_(x.label, 90), icon: vdIcon(x.icon) } : null; }).filter(Boolean).slice(0, 3); }
+    else if (kind === 'case') { V.name = s_(v.name, 90) || o.heading; V.year = s_(v.year, 12); V.panels = (Array.isArray(v.panels) ? v.panels : []).map(function (x) { return x && s_(x.label) ? { label: s_(x.label, 90), icon: vdIcon(x.icon), says: s_(x.says, 50), character: x.character && typeof x.character === 'object' && VD_PEOPLE[x.character.icon] ? { icon: x.character.icon, mood: VD_MOODS.indexOf(x.character.mood) !== -1 ? x.character.mood : '' } : null } : null; }).filter(Boolean).slice(0, 3); }
     else if (kind === 'roundup') { V.cases = (Array.isArray(v.cases) ? v.cases : []).map(function (x) { return x && s_(x.name) ? { name: s_(x.name, 80), label: s_(x.label, 130), icon: vdIcon(x.icon, 'gavel') } : null; }).filter(Boolean).slice(0, 4); }
     else if (kind === 'compare') { var side = function (x) { x = x && typeof x === 'object' ? x : {}; return { title: s_(x.title, 50), icon: vdIcon(x.icon, 'scales'), points: pts(x.points, 4, 70) }; }; V.left = side(v.left); V.right = side(v.right); }
     else if (kind === 'quiz') { V.question = s_(v.question, 220) || o.heading; V.answer = s_(v.answer, 160); V.options = arr(v.options, 4, 120); V.correct = V.options.length >= 2 ? Math.max(0, Math.min(V.options.length - 1, Math.round(num(v.answer, 0)))) : -1; if (V.options.length < 2) V.options = []; V.explain = s_(v.explain, 500); }
@@ -167,7 +199,10 @@
   }
   function vdFirstSentence(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); var m = /^(.{20,}?[.!?])(\s|$)/.exec(t); return vdClip(m ? m[1] : t, n || 240); }
   // Fill any gaps from the cards themselves (no extra request), and flag cases that aren't in the cards.
-  function vdCoverage(scenes, pool) {
+  function vdCoverage(scenes, pool, offTopic) {
+    var off = {}; (offTopic || []).forEach(function (id) { off[id] = true; });
+    var skipped = pool.filter(function (e) { return off[e.id] && !vdCovered(e, scenes); });
+    pool = pool.filter(function (e) { return skipped.indexOf(e) === -1; });
     var missing = pool.filter(function (e) { return !vdCovered(e, scenes); });
     var cases = missing.filter(function (e) { return e.type === 'case'; }), rules = missing.filter(function (e) { return e.type !== 'case'; });
     var extra = [];
@@ -199,13 +234,13 @@
         .map(function (n) { return n.replace(/^(?:In|And|Also|So|But|Then|See|Like|Under|From|After|Remember|Take|Think of|Look at) /, ''); });
       flagged += sc.warn.length;
     });
-    return { scenes: out, cov: { cards: pool.length, covered: pool.length - missing.length, added: missing.length, flagged: flagged } };
+    return { scenes: out, cov: { cards: pool.length, covered: pool.length - missing.length, added: missing.length, flagged: flagged, offTopic: skipped.length }, skipped: skipped.map(function (e) { return e.name; }) };
   }
   // Spoken time at the calm tutor pace, not counting quiz check-ins (which wait for you).
   function vdLimit(len) { return len === 'full' ? 12 * 60 : 6 * 60; }
-  function vdTeachSecs(scenes) { return scenes.reduce(function (n, s) { return n + (s.kind === 'quiz' ? 0 : vdDurAt(s, 0.85)); }, 0); }
+  function vdTeachSecs(scenes) { return scenes.reduce(function (n, s) { return n + (s.kind === 'quiz' ? 0 : vdDurAt(s, 0.78)); }, 0); }
   function vdShortenPrompt(scenes, len, pool) {
-    var words = len === 'full' ? 1450 : 700;
+    var words = len === 'full' ? 1300 : 600;
     return [
       'EXPLAINER VIDEO SHORTEN',
       'This explainer video script is too long. Rewrite it so the narration of all scenes EXCEPT quiz scenes totals at most ' + words + ' words, while keeping it warm, calm, unhurried and ELI5.',
@@ -238,9 +273,10 @@
       }, function (err) { if (err && err.code === 'cancelled') throw err; return [r, scenes]; });
     }).then(function (rs) {
       var r = rs[0], scenes = rs[1];
-      var c = vdCoverage(scenes, pool);
+      var off = (Array.isArray(r && r.offTopic) ? r.offTopic : []).map(function (x) { return s_(x, 120); });
+      var c = vdCoverage(scenes, pool, off);
       var v = sanitizeVideo({ id: uid('vd'), title: s_(r.title, 160) || label, topic: label, module: t ? t.module : (pool[0] && pool[0].module) || '', length: vd.length, style: vd.style, createdAt: nowISO(),
-        seed: Math.floor(Math.random() * 1e6) + 1, cardIds: pool.map(function (e) { return e.id; }), coverage: c.cov, scenes: c.scenes });
+        seed: Math.floor(Math.random() * 1e6) + 1, cardIds: pool.map(function (e) { return e.id; }), coverage: c.cov, skipped: c.skipped, scenes: c.scenes });
       return saveVideo(v).then(function () { vd.job = null; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.view = 'play'; renderVideo(); renderVideoCount(); toast('Video ready: “' + v.title + '”.', { type: 'success' }); });
     }).then(null, function (err) {
       if (err && err.code === 'cancelled') return;
@@ -257,7 +293,7 @@
     return window.claude.use('tts').then(function (t) {
       vd.tts = t || null;
       if (t) {
-        vd.unsub.push(t.onLine(function (e) { var m = vd.playing && e.id && /^s(\d+)(?:_0)?$/.exec(e.id); if (m) { vdShow(+m[1]); if (vd.ttsFeed) vd.ttsFeed(+m[1]); } }));
+        vd.unsub.push(t.onLine(function (e) { var m = vd.playing && e.id && /^s(\d+)(?:_(\d+))?$/.exec(e.id); if (!m) return; if (!m[2] || m[2] === '0') { vdShow(+m[1]); if (vd.ttsFeed) vd.ttsFeed(+m[1]); } else if (+m[1] === vd.scene) vdBeat(+m[2]); }));
         vd.unsub.push(t.onState(function (e) {
           if (e.state === 'idle' && vd.playing && e.reason === 'completed' && vd.ttsMore && vd.ttsMore()) { vd.ttsFeed(-1); return; }
           if (e.state === 'idle' && vd.playing && e.reason !== 'replaced' && e.reason !== 'stopped') {
@@ -267,6 +303,8 @@
             else if (e.reason === 'rate_limited') toast('The voice needs a short break. Try again in a little while, or watch with captions.', { type: 'error' });
             renderVdControls();
           }
+          if (e.state === 'paused' && vd.playing && !vd.paused) vd.paused = true;
+          if (e.state === 'speaking' && vd.playing && vd.paused) vd.paused = false;
           if (e.state === 'paused' || e.state === 'speaking') renderVdControls();
         }));
         if (t.setRate) t.setRate(vd.rate).then(null, function () {});
@@ -287,15 +325,39 @@
   function vdDur(sc) { return vdDurAt(sc, vd.rate) / (window.__vdFast || 1); }
   function vdStyleKey() { return VD_STYLES[vd.view_style] ? vd.view_style : (vd.cur && VD_STYLES[vd.cur.style] ? vd.cur.style : 'whiteboard'); }
   // A scene's words in short breaths (2-3 sentences each): the pause between lines gives the listener time to take it in.
-  function vdChunks(t) { var ss = String(t).match(/[^.!?]+[.!?]+["”’')]*\s*|[^.!?]+$/g) || [t], out = [], cur = ''; ss.forEach(function (x) { if (cur && (cur + x).length > 260) { out.push(cur.trim()); cur = ''; } cur += x; }); if (cur.trim()) out.push(cur.trim()); return out.length ? out : [String(t)]; }
+  function vdChunks(t) { var ss = String(t).match(/[^.!?]+[.!?]+["”’')]*\s*|[^.!?]+$/g) || [t], out = [], cur = ''; ss.forEach(function (x) { if (cur && (cur + x).length > 170) { out.push(cur.trim()); cur = ''; } cur += x; }); if (cur.trim()) out.push(cur.trim()); return out.length ? out : [String(t)]; }
   function vdLines(v, from) {
     var lines = [];
     v.scenes.slice(from).forEach(function (s, k) { vdChunks(s.narration).forEach(function (c, j) { lines.push({ text: c, id: 's' + (from + k) + '_' + j, voice: vd.voice }); }); });
     if (lines.length > 100) lines = v.scenes.slice(from, from + 100).map(function (s, k) { return { text: s.narration, id: 's' + (from + k) + '_0', voice: vd.voice }; });
     return lines;
   }   // seconds, roughly, at this pace
+  // Split the picture's drawing order into nb parts; only part 0 draws straight away, the rest wait for vdBeat(n).
+  function vdBeats(nb, steps, dur) {
+    var svg = $('#vdStage svg'); if (!svg) return;
+    var groups = [];
+    Array.prototype.forEach.call(svg.querySelectorAll('.vd-cam [style*="--d"]'), function (el) {
+      var d = parseFloat(el.style.getPropertyValue('--d')) || 0, b = Math.min(nb - 1, Math.floor(d * nb / Math.max(1, steps)));
+      (groups[b] = groups[b] || []).push([el, d]);
+    });
+    var widest = 1;
+    groups.forEach(function (g, b) {
+      if (!g) return;
+      var d0 = Math.min.apply(null, g.map(function (x) { return x[1]; })), d1 = Math.max.apply(null, g.map(function (x) { return x[1]; }));
+      widest = Math.max(widest, d1 - d0 + 1);
+      g.forEach(function (x) { x[0].style.setProperty('--d', String(x[1] - d0)); x[0].setAttribute('data-b', b); if (b > 0) x[0].style.animationPlayState = 'paused'; });
+    });
+    svg.style.setProperty('--step', Math.max(0.25, Math.min(1.2, (dur / Math.max(1, nb)) * 0.7 / widest)).toFixed(2) + 's');
+    vd.beat = 0;
+  }
+  function vdBeat(j) {
+    var svg = $('#vdStage svg'); if (!svg) return;
+    vd.beat = Math.max(vd.beat || 0, j);
+    Array.prototype.forEach.call(svg.querySelectorAll('[data-b]'), function (el) { if (+el.getAttribute('data-b') <= vd.beat) el.style.animationPlayState = ''; });
+  }
   function vdShow(i) {
     var v = vd.cur; if (!v || !$('#vdStage')) return;
+    vd.beatTimers.forEach(clearTimeout); vd.beatTimers = [];
     i = Math.max(0, Math.min(v.scenes.length - 1, i));
     vd.scene = i;
     var key = vdStyleKey(), T = VD_STYLES[key], sc = v.scenes[i], d = vdSceneSVG(v, sc, i, key), dur = vdDur(sc);
@@ -304,6 +366,9 @@
     $('#vdStage').innerHTML = '<svg viewBox="0 0 1280 720" class="vd-svg" role="img" aria-label="' + esc(sc.heading || v.title) + '" style="--step:' + step.toFixed(2) + 's;--late:' + (dur * 0.62).toFixed(1) + 's">' +
       '<defs>' + vdDefs(T, v.seed || 7) + '</defs>' + vdBg(T) + '<g class="vd-cam"' + (T.chalk ? ' filter="url(#vdChalk)"' : '') + '>' + d.svg + '</g>' +
       '<text x="1210" y="690" font-size="22" fill="' + T.sub + '" text-anchor="end" class="vd-plain vd-count">' + (i + 1) + ' / ' + v.scenes.length + '</text></svg>';
+    vdBeats(vdChunks(sc.narration).length, d.steps, dur);
+    if (!vd.playing) vdBeat(99);
+    else if (!vd.tts && !(vd.pvOn && pv.state === 'ready')) { var nb = vdChunks(sc.narration).length; for (var b = 1; b < nb; b++) vd.beatTimers.push(setTimeout(vdBeat, b * dur / nb * 1000, b)); }
     $('#vdCap').innerHTML = (sc.warn.length ? '<p class="vd-warn">⚠ Mentions ' + esc(sc.warn.join(', ')) + ', which isn\'t in your cards — check it.</p>' : '') +
       (sc.auto ? '<p class="vd-auto">Added by the coverage check, straight from your card.</p>' : '') + '<p>' + esc(sc.narration) + '</p>';
     $('#vdCap').hidden = !vd.cc && !sc.warn.length;
@@ -437,7 +502,7 @@
       made[i].then(function (audio) {
         clearTimeout(t0); waiting(false);
         if (tok !== vd.pvTok) return;
-        return held().then(function () { if (tok !== vd.pvTok) return; return pvPlay(audio).then(function () { if (tok !== vd.pvTok) return; setTimeout(function () { playAt(i + 1); }, 380); }); });
+        return held().then(function () { if (tok !== vd.pvTok) return; if (m && m[2] !== '0' && +m[1] === vd.scene) vdBeat(+m[2]); return pvPlay(audio).then(function () { if (tok !== vd.pvTok) return; setTimeout(function () { playAt(i + 1); }, 380); }); });
       }, function (err) {
         clearTimeout(t0); waiting(false);
         if (tok !== vd.pvTok || (err && err.code === 'stopped')) return;
@@ -469,7 +534,7 @@
       else if (vd.pvOn && pv.state === 'ready') { var tok = ++vd.pvTok; pvSay(vd.cur.id + '|q' + k + '|' + chosen + '|' + vd.pvVoice + '|' + vd.rate, say, vd.pvVoice, vd.rate, true).then(function (a) { if (tok === vd.pvTok && vd.asking === k) return pvPlay(a); }, function () {}); }
     }
   }
-  function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } }
+  function stopVdTimer() { if (vd.timer) { clearTimeout(vd.timer); vd.timer = null; } vd.beatTimers.forEach(clearTimeout); vd.beatTimers = []; }
   function vdStop(leaving) { stopVdTimer(); vd.ttsTok = (vd.ttsTok || 0) + 1; vd.ttsFeed = vd.ttsMore = null; vd.playing = false; vd.paused = false; vd.pvTok = (vd.pvTok || 0) + 1; pvHalt(); if (leaving) { pvDrop(); vd.prepKeys = null; vdAskHide(); } if (vd.tts) vd.tts.stop().then(null, function () {}); if ($('#vdStage')) $('#vdStage').classList.remove('paused'); renderVdControls(); }
   function vdToggle() { if (!vd.cur || vd.asking != null) return; if (vd.playing) vdPause(); else vdPlay(vd.ended ? 0 : vd.scene); }
   function vdPause() {
@@ -496,8 +561,8 @@
     if (vd.view === 'play' && vd.cur) {
       var v = vd.cur, c = v.coverage;
       body.innerHTML = '<div class="vd-head"><h3>' + esc(v.title) + '</h3><span>' + (v.module ? esc(MODULE_LABEL[v.module]) + ' · ' : '') + plural(v.scenes.length, 'scene') + ' · about ' + Math.max(1, Math.round(v.scenes.reduce(function (n, s) { return n + (s.kind === 'quiz' ? 0 : vdDurAt(s, vd.rate)); }, 0) / 60)) + ' min' + (function () { var q = v.scenes.filter(function (s) { return s.kind === 'quiz'; }).length; return q ? ' + ' + plural(q, 'quiz check-in') : ''; })() + ' · ' +
-        '<b class="vd-cov">Covers ' + c.covered + (c.added ? ' + ' + c.added : '') + ' of ' + plural(c.cards, 'card') + ' on this topic</b>' + (c.added ? ' (' + c.added + ' added by the coverage check)' : '') + (c.flagged ? ' · <b class="vd-bad">' + c.flagged + ' to check</b>' : '') + '</span></div>' +
-        '<div class="vd-stage" id="vdStage" title="Click to play or pause (or press the space bar)"></div><div class="vd-ask" id="vdAsk" hidden></div><div class="vd-ctl" id="vdCtl"></div><div class="vd-cap" id="vdCap"></div>';
+        '<b class="vd-cov">Covers ' + c.covered + (c.added ? ' + ' + c.added : '') + ' of ' + plural(c.cards, 'card') + ' on this topic</b>' + (c.added ? ' (' + c.added + ' added by the coverage check)' : '') + (c.flagged ? ' · <b class="vd-bad">' + c.flagged + ' to check</b>' : '') + (c.offTopic ? ' · <span title="' + esc((v.skipped || []).join(', ')) + '">' + c.offTopic + ' off-topic card' + (c.offTopic > 1 ? 's' : '') + ' left out</span>' : '') + '</span></div>' +
+        '<div class="vd-stage" id="vdStage" title="Click to play or pause (or press the space bar)"></div><div class="vd-ask" id="vdAsk" hidden></div><div class="vd-ctl" id="vdCtl"></div><div class="vd-cap" id="vdCap"></div>' + vdChatHTML();
       foot.innerHTML = '<button type="button" class="btn" data-vd="list">← All videos</button><span class="spacer"></span><button type="button" class="btn" data-close>Close</button>';
       vdShow(vd.scene || 0);
       return;
@@ -512,7 +577,7 @@
           : '<div class="form-field"><label class="lbl" for="vdConcept">Concept</label><input class="input" id="vdConcept" maxlength="120" value="' + esc(vd.concept) + '" placeholder="e.g. promissory estoppel, but-for test, consideration"></div>') +
         '<div class="form-field"><span class="lbl">Length</span><div class="seg"><button type="button" class="seg-btn' + (vd.length === 'quick' ? ' on' : '') + '" data-vd="len" data-l="quick">Refresher</button><button type="button" class="seg-btn' + (vd.length === 'full' ? ' on' : '') + '" data-vd="len" data-l="full">Full lesson (with quiz check-ins)</button></div></div>' +
         '<div class="form-field"><span class="lbl">Style <span class="hint">(you can switch while watching — it\'s free)</span></span><div class="vd-styles">' + VD_STYLE_ORDER.map(function (k) { var T = VD_STYLES[k]; return '<button type="button" class="vd-sty' + (vd.style === k ? ' on' : '') + '" data-vd="sty" data-s="' + k + '"><i style="background:' + (T.bg === 'sky' ? 'linear-gradient(#cfe6ff,#fdf2ff)' : T.bg) + '">' + T.pens.slice(0, 4).map(function (c) { return '<b style="background:' + c + '"></b>'; }).join('') + '</i><span>' + T.label + '</span></button>'; }).join('') + '</div></div>' +
-        '<p class="vd-pool" id="vdPool">' + (pool.length ? 'Made from <b>' + plural(pool.length, 'card') + '</b>: ' + esc(pool.slice(0, 8).map(function (e) { return e.name; }).join(', ')) + (pool.length > 8 ? '…' : '') + (pool.length > 14 && vd.length === 'quick' ? '<br><span class="warn">That\'s a lot for a quick refresher; a full explainer gives each case more room.</span>' : '') : (vd.mode === 'topic' ? 'Choose a topic to see which cards it uses.' : 'Type a concept to find matching cards.')) + '</p>' +
+        '<div class="vd-pool" id="vdPool">' + vdPoolHTML() + '</div>' +
         '<p class="muted rn-note">Uses one Claude request per video. Saved videos replay for free. Only your own cards are used for the law.</p>' +
         (claudeCaps.sample ? '' : '<p class="step-note warn">Videos are written by Claude, which works when the app is opened in claude.ai.</p>');
       foot.innerHTML = '<button type="button" class="btn" data-vd="list">Back</button><span class="spacer"></span><button type="button" class="btn btn-primary" data-vd="make"' + (claudeCaps.sample && pool.length ? '' : ' disabled') + '>✦ Make video</button>';
@@ -535,8 +600,10 @@
     else if (a === 'sty') { vd.style = el.getAttribute('data-s'); vdPref('style', vd.style); renderVideo(); }
     else if (a === 'make') startVideo();
     else if (a === 'cancel') { if (vd.job) vd.job.ctl.abort(); vd.job = null; vd.view = 'new'; renderVideo(); }
-    else if (a === 'open') { vdStop(true); var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
+    else if (a === 'open') { vdChat.q = ''; vdChat.answer = ''; vdChat.hits = []; vdStop(true); var v = state.videos.filter(function (x) { return x.id === id; })[0]; if (!v) return; vd.cur = v; vd.view_style = ''; vd.scene = 0; vd.ended = false; vd.view = 'play'; renderVideo(); }
     else if (a === 'play') vdPlay(vd.ended ? 0 : vd.asking != null ? vd.asking + 1 : vd.scene);
+    else if (a === 'chatask') vdChatAsk();
+    else if (a === 'chatsay') vdChatSay();
     else if (a === 'ans') { vdAsk(vd.asking, +el.getAttribute('data-o')); }
     else if (a === 'cont') { var nx = vd.asking + 1; vd.pvTok++; pvHalt(); if (vd.tts) vd.tts.stop().then(null, function () {}); vdAskHide(); if (nx >= vd.cur.scenes.length) { vd.ended = true; renderVdControls(); } else vdPlay(nx); }
     else if (a === 'pvon') vdPvOn();
@@ -563,6 +630,8 @@
     var m = $('#vdModal');
     m._onClose = function () { vdStop(true); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); };
     m.addEventListener('click', function (ev) { var b = ev.target.closest('[data-vd]'); if (b) videoAction(b.getAttribute('data-vd'), b); else if (ev.target.closest('#vdStage')) vdToggle(); });
+    m.addEventListener('submit', function (ev) { if (ev.target.id === 'vdChatForm') { ev.preventDefault(); vdChatSearch($('#vdChatQ').value); } });
+    m.addEventListener('focusin', function (ev) { if (ev.target.id === 'vdChatQ' && vd.playing && !vd.paused) vdPause(); });
     document.addEventListener('keydown', function (ev) {
       if ((ev.key === ' ' || ev.key === 'k') && !m.hidden && topModal() === m && vd.view === 'play' && !(ev.target.closest && ev.target.closest('input, select, textarea, button, [contenteditable]'))) { ev.preventDefault(); vdToggle(); }
     });
@@ -570,19 +639,20 @@
     document.addEventListener('visibilitychange', function () { if (document.hidden && vd.playing && !vd.paused && !vd.tts) vdPause(); });
     m.addEventListener('change', function (ev) {
       var t = ev.target;
-      if (t.id === 'vdTopic') { vd.topic = t.value; renderVideo(); }
+      if (t.id === 'vdTopic') { vd.topic = t.value; vd.excluded = {}; renderVideo(); }
+      else if (t.matches('[data-vdcard]')) { vd.excluded[t.getAttribute('data-vdcard')] = !t.checked; var go = $('#vdFoot [data-vd="make"]'); if (go) go.disabled = !(claudeCaps.sample && vdPool().length); var hd = $('.vd-pool-head b'); if (hd) hd.textContent = plural(vdPool().length, 'card'); }
       else if (t.id === 'vdPVoice') { vd.pvVoice = t.value; vdPref('pvVoice', t.value); if (vd.playing) vdPlay(vd.scene); }
       else if (t.id === 'vdVoice') { vd.voice = t.value; if (vd.playing) vdPlay(vd.scene); }
-      else if (t.id === 'vdRate') { vd.rate = +t.value || 0.85; vdPref('rate', vd.rate); if (!vd.tts && vd.pvOn && vd.playing) vdPlay(vd.scene); if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
+      else if (t.id === 'vdRate') { vd.rate = +t.value || 0.78; vdPref('rate', vd.rate); if (!vd.tts && vd.pvOn && vd.playing) vdPlay(vd.scene); if (vd.tts && vd.tts.setRate) vd.tts.setRate(vd.rate).then(null, function () {}); }
       else if (t.id === 'vdStyle') { vd.view_style = t.value; vdPref('style', t.value); vdShow(vd.scene); }
     });
     var deb = null;
     m.addEventListener('input', function (ev) {
       if (ev.target.id !== 'vdConcept') return;
-      vd.concept = ev.target.value;
+      vd.concept = ev.target.value; vd.excluded = {};
       clearTimeout(deb); deb = setTimeout(function () {
         var pool = vdPool(), p = $('#vdPool'), go = $('#vdFoot [data-vd="make"]');
-        if (p) p.innerHTML = pool.length ? 'Made from <b>' + plural(pool.length, 'card') + '</b>: ' + esc(pool.slice(0, 8).map(function (e) { return e.name; }).join(', ')) + (pool.length > 8 ? '…' : '') : 'No cards match yet — try other words.';
+        if (p) p.innerHTML = vdPoolHTML();
         if (go) go.disabled = !(claudeCaps.sample && pool.length);
       }, 250);
     });
